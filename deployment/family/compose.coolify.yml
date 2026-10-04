@@ -10,6 +10,8 @@ services:
     image: family-opendots:local
     restart: unless-stopped
     mem_limit: 1g
+    env_file:
+      - /root/devvy/workorders/WO-FAMDOTS-001-standup.family.env
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
