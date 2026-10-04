@@ -172,7 +172,7 @@ const server = serve({ fetch: app.fetch, hostname: host, port }, (info) => {
 
 const shutdown = createShutdown({
   stopRunner: () => runner.stop(),
-  stopPlatform: () => platform?.stop(),
+  stopPlatform: () => platform?.stop() ?? Promise.resolve(),
   closeServer: () =>
     new Promise<void>((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),
