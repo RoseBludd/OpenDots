@@ -9,22 +9,56 @@ import { createApp } from './app.js';
 import { WorkspaceStore } from './workspace.js';
 import { Platform } from './platform.js';
 import type { PlatformConfig } from './platform-config.js';
+import { AuthStore } from './auth-store.js';
+import {
+  applyFamilyPackage,
+  loadFamilyPackage,
+} from './family-bootstrap.js';
+import { storageAdapterFromEnv } from './storage-adapter.js';
+
 const host = process.env.HOST ?? '127.0.0.1';
 const port = Number(process.env.PORT ?? 4310);
 const ownerToken = process.env.OWNER_TOKEN;
+const familyMode =
+  process.env.FAMILY_MODE === '1' || process.env.FAMILY_MODE === 'true';
+const loopbackHosts = new Set(['127.0.0.1', '::1', 'localhost']);
+
 if (
-  !['127.0.0.1', '::1', 'localhost'].includes(host) &&
+  !familyMode &&
+  !loopbackHosts.has(host) &&
   (!ownerToken || ownerToken.length < 24)
 )
   throw new Error(
     'External binding requires an OWNER_TOKEN of at least 24 characters.',
   );
+if (familyMode && !loopbackHosts.has(host) && !process.env.APP_ORIGIN)
+  throw new Error(
+    'FAMILY_MODE external binding requires APP_ORIGIN (e.g. https://family.geniuzs.com).',
+  );
+
 const database = process.env.DATABASE_PATH ?? 'data/opendots.sqlite';
 const store = new Store(database);
 const workspace = new WorkspaceStore(
   database,
   process.env.OWNER_ID ?? 'opendots-owner',
 );
+
+let auth: AuthStore | undefined;
+if (familyMode) {
+  const sessionSecret = process.env.SESSION_SECRET;
+  if (!sessionSecret || sessionSecret.length < 32)
+    throw new Error(
+      'FAMILY_MODE requires SESSION_SECRET of at least 32 characters.',
+    );
+  const authPath =
+    process.env.AUTH_DATABASE_PATH ??
+    database.replace(/\.sqlite$/i, '-auth.sqlite');
+  auth = new AuthStore(authPath, sessionSecret);
+  storageAdapterFromEnv();
+  const pkgPath = process.env.FAMILY_PACKAGE_PATH;
+  if (pkgPath) applyFamilyPackage(store, workspace, loadFamilyPackage(pkgPath));
+}
+
 const config: PlatformConfig = {
   intelligenceKey: process.env.INTELLIGENCE_API_KEY,
   intelligenceApiUrl: process.env.INTELLIGENCE_API_URL || undefined,
@@ -53,7 +87,11 @@ const config: PlatformConfig = {
   runtimeUrl: `http://${host === '::1' ? '[::1]' : '127.0.0.1'}:${port}/api/copilotkit`,
   ownerToken,
 };
-const platform = new Platform(store, workspace, config);
+
+const platform = config.intelligenceKey
+  ? new Platform(store, workspace, config)
+  : undefined;
+
 const researchConfig = {
   mode: 'live' as const,
   apiKey: config.apiKey,
@@ -64,6 +102,7 @@ const researchConfig = {
   browserUrl: config.browserUrl,
   browserSecret: config.browserSecret,
 };
+
 const runner = new Runner(
   store,
   researchConfig,
@@ -73,14 +112,18 @@ const runner = new Runner(
       throw new Error(
         'This legacy task has no Intelligence conversation. Create a new scheduled task from a conversation.',
       );
+    if (!platform)
+      throw new Error('Intelligence is not configured for scheduled tasks.');
     progress('Running this task in its Intelligence conversation.');
     const text = await platform.turn(threadId, claim.prompt, signal);
     return { text, sources: [], sample: false };
   },
 );
+
 const wsOrigin = new URL(
   config.intelligenceWsUrl ?? 'wss://realtime.intelligence.copilotkit.ai',
 ).origin;
+
 const app = createApp({
   store,
   runner,
@@ -92,7 +135,10 @@ const app = createApp({
       ? 'http://127.0.0.1:5173'
       : undefined),
   platform,
+  auth,
+  familyMode,
 });
+
 app.use('*', async (c, next) => {
   c.header('X-Content-Type-Options', 'nosniff');
   c.header('Referrer-Policy', 'no-referrer');
@@ -105,21 +151,28 @@ app.use('*', async (c, next) => {
 app.get('/api/*', (c) => c.json({ error: 'Not found.' }, 404));
 app.use('/*', serveStatic({ root: './dist/client' }));
 app.get('*', serveStatic({ path: './dist/client/index.html' }));
+
 const server = serve({ fetch: app.fetch, hostname: host, port }, (info) => {
-  console.log(`OpenDots template listening on http://${host}:${info.port}`);
+  console.log(
+    familyMode
+      ? `Family OpenDots listening on http://${host}:${info.port}`
+      : `OpenDots template listening on http://${host}:${info.port}`,
+  );
   runner.start();
-  void platform
-    .start()
-    .catch((error) =>
-      reportChannelFailure(
-        'Slack Channels activation failed; check setup status',
-        [safeFailure(error)],
-      ),
-    );
+  if (platform)
+    void platform
+      .start()
+      .catch((error) =>
+        reportChannelFailure(
+          'Slack Channels activation failed; check setup status',
+          [safeFailure(error)],
+        ),
+      );
 });
+
 const shutdown = createShutdown({
   stopRunner: () => runner.stop(),
-  stopPlatform: () => platform.stop(),
+  stopPlatform: () => platform?.stop(),
   closeServer: () =>
     new Promise<void>((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),

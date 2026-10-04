@@ -1,0 +1,43 @@
+# Coolify / Traefik — family.geniuzs.com (phase 0)
+# Build context: repo root; target app stage only (no browser/computer sidecars).
+services:
+  family-opendots:
+    container_name: family-opendots
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      target: app
+    image: family-opendots:local
+    restart: unless-stopped
+    mem_limit: 1g
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: '3430'
+      DATABASE_PATH: /data/opendots.sqlite
+      AUTH_DATABASE_PATH: /data/family-auth.sqlite
+      FAMILY_MODE: '1'
+      APP_ORIGIN: https://family.geniuzs.com
+      FAMILY_PACKAGE_PATH: deployment/family/family.package.yaml
+      # SESSION_SECRET — set in Coolify (32+ chars); never commit.
+      COMPUTER_SUPERVISOR_URL: ''
+      COMPUTER_MAX_BROWSERS: '0'
+      WEB_SEARCH_PROVIDER: disabled
+    volumes:
+      - family-opendots-data:/data
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.family-opendots.rule=Host(`family.geniuzs.com`)
+      - traefik.http.routers.family-opendots.entrypoints=https
+      - traefik.http.routers.family-opendots.tls=true
+      - traefik.http.services.family-opendots.loadbalancer.server.port=3430
+    networks:
+      - coolify
+
+volumes:
+  family-opendots-data:
+    external: true
+
+networks:
+  coolify:
+    external: true

@@ -9,6 +9,8 @@ import { configured, type Config } from './research.js';
 import type { Platform } from './platform.js';
 import { VoiceService } from './voice.js';
 import { workspaceRoutes } from './workspace-routes.js';
+import { authRoutes } from './auth-routes.js';
+import type { AuthStore } from './auth-store.js';
 const interval = z.number().int().min(60).max(31_536_000).nullable();
 export interface AppOptions {
   store: Store;
@@ -17,6 +19,21 @@ export interface AppOptions {
   ownerToken?: string;
   origin?: string;
   platform?: Platform;
+  auth?: AuthStore;
+  familyMode?: boolean;
+}
+function bearerAuthorized(
+  c: { req: { header: (n: string) => string | undefined } },
+  ownerToken?: string,
+) {
+  if (!ownerToken) return false;
+  const expected = Buffer.from(ownerToken);
+  const supplied = Buffer.from(
+    c.req.header('authorization')?.replace(/^Bearer /, '') ?? '',
+  );
+  return (
+    expected.length === supplied.length && timingSafeEqual(expected, supplied)
+  );
 }
 export function createApp({
   store,
@@ -25,8 +42,11 @@ export function createApp({
   ownerToken,
   origin,
   platform,
+  auth,
+  familyMode = false,
 }: AppOptions) {
   const app = new Hono();
+  if (auth) app.route('/api/auth', authRoutes(auth, origin));
   app.use(
     '/api/*',
     bodyLimit({
@@ -38,13 +58,18 @@ export function createApp({
     c.header('Cache-Control', 'no-store');
     c.header('X-Content-Type-Options', 'nosniff');
     const requestUrl = new URL(c.req.url);
+    const path = requestUrl.pathname;
+    const authPublic =
+      path === '/api/auth/config' ||
+      path === '/api/auth/register' ||
+      path === '/api/auth/login';
     const allowedHosts = new Set([
       'localhost',
       '127.0.0.1',
       '[::1]',
       ...(origin ? [new URL(origin).hostname] : []),
     ]);
-    if (!ownerToken && !allowedHosts.has(requestUrl.hostname))
+    if (!ownerToken && !auth && !allowedHosts.has(requestUrl.hostname))
       return c.json({ error: 'Unrecognized host.' }, 403);
     const requestOrigin = c.req.header('origin');
     const expectedOrigin = origin ?? new URL(c.req.url).origin;
@@ -52,15 +77,12 @@ export function createApp({
       return c.json({ error: 'Cross-origin requests are not allowed.' }, 403);
     if (c.req.header('sec-fetch-site') === 'cross-site')
       return c.json({ error: 'Cross-site requests are not allowed.' }, 403);
-    if (ownerToken) {
-      const expected = Buffer.from(ownerToken);
-      const supplied = Buffer.from(
-        c.req.header('authorization')?.replace(/^Bearer /, '') ?? '',
-      );
-      if (
-        expected.length !== supplied.length ||
-        !timingSafeEqual(expected, supplied)
-      )
+    if (auth && !authPublic) {
+      const sessionUser = auth.userFromContext(c);
+      if (!sessionUser && !bearerAuthorized(c, ownerToken))
+        return c.json({ error: 'Sign in to continue.' }, 401);
+    } else if (ownerToken) {
+      if (!bearerAuthorized(c, ownerToken))
         return c.json(
           { error: 'Enter your owner access token to unlock OpenDots.' },
           401,

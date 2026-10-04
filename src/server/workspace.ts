@@ -94,6 +94,19 @@ export class WorkspaceStore {
       .run(space.id, name, description, space.createdAt);
     return space;
   }
+  updateSpace(
+    id: string,
+    patch: { name?: string; description?: string },
+  ): Space {
+    const current = this.spaces().find((space) => space.id === id);
+    if (!current) throw new Error('Space not found.');
+    const name = patch.name ?? current.name;
+    const description = patch.description ?? current.description;
+    this.db
+      .prepare('UPDATE spaces SET name=?, description=? WHERE id=?')
+      .run(name, description, id);
+    return { ...current, name, description };
+  }
   dots(): Dot[] {
     return this.db
       .prepare('SELECT * FROM dots ORDER BY createdAt')
