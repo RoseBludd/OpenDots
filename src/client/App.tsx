@@ -94,6 +94,10 @@ export function App() {
 
   const [error, setError] = useState('');
   const [auth, setAuth] = useState('');
+  const [familyEmail, setFamilyEmail] = useState('');
+  const [familyPassword, setFamilyPassword] = useState('');
+  const [familyName, setFamilyName] = useState('');
+  const [familyBootstrap, setFamilyBootstrap] = useState<boolean | null>(null);
   const [needsAuth, setNeedsAuth] = useState(false);
   const [dialog, setDialog] = useState<Dialog>();
   const [mobile, setMobile] = useState(false);
@@ -122,6 +126,16 @@ export function App() {
           e instanceof Error ? e.message : 'Could not connect to the server.',
         );
     }
+  }, []);
+  useEffect(() => {
+    void fetch('/api/auth/config', { credentials: 'include' })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: { mode?: string; bootstrap?: boolean } | null) => {
+        if (data?.mode === 'family')
+          setFamilyBootstrap(data.bootstrap ?? false);
+        else setFamilyBootstrap(null);
+      })
+      .catch(() => setFamilyBootstrap(null));
   }, []);
   useEffect(() => {
     void refresh();
@@ -199,6 +213,85 @@ export function App() {
       setBusy(false);
     }
   };
+  if (needsAuth && familyBootstrap !== null)
+    return (
+      <main className="unlock">
+        <Mascot />
+        <h1>Genius Family</h1>
+        <p>
+          {familyBootstrap
+            ? 'Create the first guardian account for your family home.'
+            : 'Sign in with your family email and password.'}
+        </p>
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setError('');
+            const path = familyBootstrap ? '/auth/register' : '/auth/login';
+            const body = familyBootstrap
+              ? {
+                  name: familyName.trim() || 'Guardian',
+                  email: familyEmail.trim(),
+                  password: familyPassword,
+                }
+              : { email: familyEmail.trim(), password: familyPassword };
+            try {
+              await api(path, 'POST', body);
+              setError('');
+              await refresh();
+            } catch (err) {
+              setError(
+                err instanceof Error
+                  ? err.message
+                  : 'Could not sign in to the family home.',
+              );
+            }
+          }}
+        >
+          {familyBootstrap && (
+            <input
+              type="text"
+              aria-label="Your name"
+              autoComplete="name"
+              placeholder="Your name"
+              value={familyName}
+              onChange={(e) => setFamilyName(e.target.value)}
+              required
+            />
+          )}
+          <input
+            type="email"
+            aria-label="Email"
+            autoComplete="email"
+            placeholder="Email"
+            value={familyEmail}
+            onChange={(e) => setFamilyEmail(e.target.value)}
+            required
+          />
+          <input
+            type="password"
+            aria-label="Password"
+            autoComplete={
+              familyBootstrap ? 'new-password' : 'current-password'
+            }
+            placeholder="Password (8+ characters)"
+            value={familyPassword}
+            onChange={(e) => setFamilyPassword(e.target.value)}
+            minLength={8}
+            required
+          />
+          <button className="primary">
+            {familyBootstrap ? 'Create family home' : 'Sign in'}
+          </button>
+        </form>
+        {error && (
+          <p className="chat-error" role="alert">
+            {error}
+          </p>
+        )}
+        <p className="muted">Guardians manage who joins the family home.</p>
+      </main>
+    );
   if (needsAuth)
     return (
       <main className="unlock">
