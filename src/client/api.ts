@@ -21,6 +21,7 @@ export async function api<T>(
   const response = await fetch(`/api${path}`, {
     method,
     signal,
+    credentials: 'include',
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(['GET', 'HEAD'].includes(method)
