@@ -8,7 +8,6 @@ import {
   ArrowUpRight,
   BookOpen,
   Clock3,
-  Code2,
   Folder,
   Menu,
   MessageCircle,
@@ -626,16 +625,6 @@ export function App() {
             <Settings2 size={17} />
             <span>Settings & setup</span>
           </button>
-          <a
-            className="nav-item"
-            href="https://github.com/CopilotKit/OpenDots"
-            target="_blank"
-            rel="noreferrer"
-          >
-            <Code2 size={17} />
-            <span>Make it your own</span>
-            <ArrowUpRight size={13} />
-          </a>
           <div className="version">
             OPEN SOURCE TEMPLATE <span>v0.1</span>
           </div>
