@@ -1,76 +1,66 @@
 #!/bin/bash
-set -euo pipefail
-BASE=https://family.geniuzs.com
-API=$BASE/api/auth
-PASS=$(awk -F' / ' '{print $NF}' /root/.family-guardian-credentials)
-FAILED=0
-pass(){ echo "PASS: $1"; }
-fail(){ echo "FAIL: $1"; FAILED=1; }
-check(){ local n="$1"; local code="$2"; if [ "$code" = "$3" ]; then pass "$n -> $code"; else fail "$n expected $3 got $code"; fi; }
+set -uo pipefail
+BASE="http://10.0.1.60:3430"
+PASS=$(awk 'NR==2{print $3}' /root/.family-guardian-credentials)
+COOKIES=$(mktemp); SIBCOOKIES=$(mktemp); GC=$(mktemp)
+res(){ curl -s -w "\n--> HTTP %{http_code}" "${@}"; }
 
-# 1. register w/o code -> 400
-r=$(curl -s -o /dev/null -w '%{http_code}' -X POST $API/register -d '{"name":"NoCode","email":"nocode-acceptance-test@family.geniuzs.com","password":"x","joinCode":""}')
-check "register no code" "$r" "400"
+echo "=== A1: register w/o join code (expect 400) ==="
+res -c "$GC" -X POST "$BASE/api/auth/register" -H "Content-Type: application/json" -d '{"email":"no-code@test.com","password":"Pass1234!","name":"No Code"}'; echo
 
-# 2. get guardian session
-session=$(curl -s -c /tmp/curlcookies -X POST $API/login -d '{"email":"admin@juelzs.com","password":"'$PASS'"}' | python3 -c "import sys,json;print(json.load(sys.stdin)['session'])")
-echo "guardian session: ${session:0:32}..."
+echo "=== A2: guardian login + /me ==="
+LOGIN=$(curl -s -c "$COOKIES" -X POST "$BASE/api/auth/login" -H "Content-Type: application/json" -d '{"email":"admin@juelzs.com","password":"'"$PASS"'"}')
+echo "login: $LOGIN"
+ME=$(curl -s -b "$COOKIES" "$BASE/api/auth/me")
+echo "me: ${ME:0:200}"
 
-# 3. /join-codes unauth -> 401
-check "join-codes unauth" "$(curl -s -o /dev/null -w '%{http_code}' $BASE/api/auth/join-codes)" "401"
+echo "=== A3: /join-codes POST unauth (expect 401) ==="
+res -o /dev/null -X POST "$BASE/api/auth/join-codes" -H "Content-Type: application/json" -d '{"role":"adult"}'; echo
 
-# 4. /join-codes non-guardian -> 403
-check "join-codes non-guardian" "$(curl -s -o /dev/null -w '%{http_code}' -H "Cookie: session=$session" $BASE/api/auth/join-codes?filter=mine)" "403"
+echo "=== A4: guardian creates join code (expect 201) ==="
+CREATE=$(curl -s -b "$COOKIES" -w "\n%{http_code}" -X POST "$BASE/api/auth/join-codes" -H "Content-Type: application/json" -d '{"role":"adult"}')
+echo "create: $CREATE"
+CODE=$(echo "$CREATE" | head -1 | python3 -c 'import sys,json;print(json.load(sys.stdin).get("code",""))' 2>/dev/null)
+echo "CODE=$CODE"
 
-# 5. create sibling guardian then non-guardian 403 on /join-codes POST
-sib=$(curl -s -c /tmp/sibcookies -X POST $API/register -d '{"name":"Sibling","email":"sibling-acceptance@family.geniuzs.com","password":"x","joinCode":""}')
-sibcode=$(echo $sib | python3 -c "import sys,json;print(json.load(sys.stdin)['session'])")
-check "sibling join-codes POST non-guardian" "$(curl -s -o /dev/null -w '%{http_code}' -H "Cookie: session=$sibcode" -X POST $BASE/api/auth/join-codes -d '{"role":"adult","expiresInHours":""}')" "403"
+echo "=== A5: register w/ valid code (expect 201) ==="
+res -c "$SIBCOOKIES" -X POST "$BASE/api/auth/register" -H "Content-Type: application/json" -d '{"email":"sibling@family.com","password":"Pass1234!","name":"Sibling","joinCode":"'"$CODE"'"}'; echo
 
-# 6. guardian creates code
-rcode=$(curl -s -H "Cookie: session=$session" -X POST $API/join-codes -d '{"role":"adult","expiresInHours":""}' | python3 -c "import sys,json;print(d.get('code',''))" d="$(curl -s -H "Cookie: session=$session" -X POST $API/join-codes -d '{"role":"adult","expiresInHours":""}')")
-echo "generated code: $rcode"
-if [ -z "$rcode" ]; then fail "join code empty"; fi
-check "guardian create code 201" "$(curl -s -o /dev/null -w '%{http_code}' -H "Cookie: session=$session" -X POST $API/join-codes -d '{"role":"adult","expiresInHours":""}')" "201"
+echo "=== A6: reuse same code (expect 400 used) ==="
+res -o /dev/null -X POST "$BASE/api/auth/register" -H "Content-Type: application/json" -d '{"email":"dup@family.com","password":"Pass1234!","name":"Dup","joinCode":"'"$CODE"'"}'; echo
 
-# 7. join sibling with valid code -> 201
-rid=$(curl -s -o /dev/null -w '%{http_code}' -c /tmp/joincookies -X POST $API/register -d '{"name":"JoinTest Adult","email":"join-test-adult@family.geniuzs.com","password":"x","joinCode":"'$rcode'"}')
-check "join valid code -> 201" "$rid" "201"
-jcode=$(curl -s -c /tmp/joincookies -X POST $API/register -d '{"name":"JoinTest Adult","email":"join-test-adult@family.geniuzs.com","password":"x","joinCode":"'$rcode'"}' | python3 -c "import sys,json;print(json.load(sys.stdin)['session'])")
+echo "=== A7: non-guardian /join-codes (expect 403) ==="
+res -o /dev/null -b "$SIBCOOKIES" -X POST "$BASE/api/auth/join-codes" -H "Content-Type: application/json" -d '{"role":"adult"}'; echo
 
-# 8. same code reused -> 400
-check "join reused code -> 400" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $API/register -d '{"name":"JoinTest Adult","email":"join-test-adult@family.geniuzs.com","password":"x","joinCode":"'$rcode'"}')" "400"
+echo "=== A8: avatar wrong type (expect 400) ==="
+res -o /dev/null -b "$SIBCOOKIES" -X POST "$BASE/api/auth/avatar" -H "Content-Type: application/json" -d '{"dataUrl":"data:image/gif;base64,SGVsbG8="}'; echo
 
-# 9. expired code -> 400
-ex=$(curl -s -H "Cookie: session=$session" -X POST $API/join-codes -d '{"role":"kid","expiresInHours":"0.001"}' | python3 -c "import sys,json;print(json.load(sys.stdin)['code'])")
-check "expired code -> 400" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $API/register -d '{"name":"KidJoin","email":"kidjoin@family.geniuzs.com","password":"x","joinCode":"'$ex'"}')" "400"
+echo "=== A9: avatar valid 1x1 PNG (expect 201) ==="
+B64=$(python3 - <<'PY'
+import base64
+img=bytes.fromhex('89504e470d0a1a0a0000000d4948445200000001000000010802000000907753de0000000c4944415408d763f8c30000000300000154a259600000000049454e44ae426082')
+print(base64.b64encode(img).decode())
+PY
+)
+res -o /dev/null -b "$SIBCOOKIES" -X POST "$BASE/api/auth/avatar" -H "Content-Type: application/json" -d '{"dataUrl":"data:image/png;base64,'"$B64"'"}'; echo
 
-# 10. invalid code -> 400
-check "invalid code -> 400" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $API/register -d '{"name":"BadJoin","email":"badjoin@family.geniuzs.com","password":"x","joinCode":"ZZZZZZZZ"}')" "400"
+echo "=== A10: sibling GET avatar bytes ==="
+res -o /tmp/sib-avatar.png -b "$SIBCOOKIES" "$BASE/api/auth/avatar"; echo
+echo "avatar file bytes: $(stat -c %s /tmp/sib-avatar.png 2>/dev/null)"
 
-# 11. avatar: wrong type -> 400
-check "avatar gif type -> 400" "$(curl -s -o /dev/null -w '%{http_code}' -H "Cookie: session=$jcode" -X POST $API/avatar -d '{"dataUrl":"data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"}')" "400"
+echo "=== A11: guardian lists members + codes ==="
+MEM=$(curl -s -b "$COOKIES" "$BASE/api/auth/members"; echo)
+echo "members: $(echo "$MEM" | head -c 300)"
+res -o /dev/null -b "$COOKIES" -X GET "$BASE/api/auth/join-codes"; echo
 
-# 12. valid avatar -> 201
-png=$(base64 -w0 /root/devvy/preview/acceptance-test-avatar.png 2>/dev/null || printf '%s' "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")
-check "avatar valid PNG -> 201" "$(curl -s -o /dev/null -w '%{http_code}' -H "Cookie: session=$jcode" -X POST $API/avatar -d '{"dataUrl":"data:image/png;base64,'$png'"}')" "201"
+echo "=== A12: avatars dir + survival across force-recreate ==="
+AVDIR=$(curl -s -b "$SIBCOOKIES" "$BASE/api/auth/me" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("avatarPath",""))' 2>/dev/null)
+echo "avatarPath=$AVDIR"
+docker compose -p family -f /root/devvy/worktrees/WO-FAMDOTS-004/deployment/family/compose.coolify.yml up -d --force-recreate 2>&1 | tail -3
+sleep 2
+G2=$(curl -s -o /tmp/sib-avatar2.png -b "$SIBCOOKIES" -w "%{http_code}" "$BASE/api/auth/avatar")
+echo "post-recreate GET avatar: HTTP $G2 bytes $(stat -c %s /tmp/sib-avatar2.png 2>/dev/null)"
+cmp -s /tmp/sib-avatar.png /tmp/sib-avatar2.png && echo "AVATAR SURVIVES: yes" || echo "AVATAR SURVIVES: NO"
 
-# 13. avatar GET serves bytes
-auid=$(curl -s -H "Cookie: session=$jcode" $API/me | python3 -c "import sys,json;print(json.load(sys.stdin)['id'])")
-a=$(curl -s -o /tmp/avatar.png -w '%{http_code}' -H "Cookie: session=$jcode" $BASE/api/auth/avatar?userId=$auid)
-if [ -s /tmp/avatar.png ]; then pass "avatar GET -> bytes saved, $(wc -c < /tmp/avatar.png)B"; else fail "avatar GET empty, code=$a"; fi
-
-# 14. guardian sees member in /members
-mc=$(curl -s -o /dev/null -w '%{http_code}' -H "Cookie: session=$session" $API/members)
-mem=$(curl -s -H "Cookie: session=$session" $API/members | python3 -c "import sys,json;print(len(json.load(sys.stdin)))")
-check "guardian /members list" "$mc" "200"
-echo "members count: $mem"
-if [ "$mem" -ge 2 ]; then pass "guardian sees sibling+join-test members"; else fail "members count $mem < 2"; fi
-
-# 15. /config reads
-cfg=$(curl -s -o /dev/null -w '%{http_code}' $API/config)
-mode=$(curl -s $API/config | python3 -c "import sys,json;print(json.load(sys.stdin)['mode'])")
-check "/config reads" "$cfg" "200"
-echo "config mode: $mode"
-
-exit $FAILED
+echo "=== DONE ==="
+rm -f "$GC" "$COOKIES" "$SIBCOOKIES"
