@@ -3100,6 +3100,148 @@ h3 {
 .icon-rail .rail-settings {
   margin-top: auto;
 }
+.icon-rail .rail-avatar {
+  border-radius: 50%;
+  overflow: hidden;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e4e2ec;
+}
+.icon-rail .rail-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.icon-rail .rail-avatar span {
+  font-size: 14px;
+  font-weight: 600;
+  color: #6a6478;
+}
+.family-section {
+  margin: 22px 0;
+  padding-top: 18px;
+  border-top: 1px solid #eeecf4;
+}
+.family-section h3 {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6a6478;
+  margin: 0 0 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.family-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+.avatar-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #e4e2ec;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.avatar-circle img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.avatar-circle span {
+  font-size: 18px;
+  font-weight: 600;
+  color: #6a6478;
+}
+.member-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f3f2f7;
+}
+.member-row:last-child {
+  border-bottom: none;
+}
+.member-row .avatar-circle {
+  width: 32px;
+  height: 32px;
+}
+.member-row .avatar-circle span {
+  font-size: 13px;
+}
+.member-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.member-info strong {
+  font-size: 13px;
+}
+.member-info small {
+  font-size: 11px;
+  color: #999eaa;
+}
+.role-badge {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #ece9f6;
+  color: #6a6478;
+  flex-shrink: 0;
+}
+.join-code-generator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+}
+.join-code-generator select {
+  width: auto;
+}
+.join-code-display {
+  background: #eef6ef;
+  border: 1px solid #d4ead6;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 8px 0;
+  font-size: 13px;
+}
+.join-code-display code {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.join-code-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 12px;
+  color: #6a6478;
+  border-bottom: 1px solid #f3f2f7;
+}
+.join-code-item:last-child {
+  border-bottom: none;
+}
+.join-code-item .status-used {
+  color: #a2a0ad;
+}
+.join-code-item button {
+  margin-left: auto;
+  font-size: 11px;
+  padding: 4px 8px;
+}
 .template-app.app .sidebar {
   left: 48px;
   width: 220px;
