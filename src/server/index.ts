@@ -144,7 +144,17 @@ const app = createApp({
   familyMode,
 });
 if (familyStore && auth)
-  app.route('/api/family', familyRoutes(familyStore, auth, origin));
+  app.route(
+    '/api/family',
+    familyRoutes(
+      familyStore,
+      auth,
+      process.env.APP_ORIGIN ??
+        (process.env.NODE_ENV === 'development'
+          ? 'http://127.0.0.1:5173'
+          : undefined),
+    ),
+  );
 
 app.use('*', async (c, next) => {
   c.header('X-Content-Type-Options', 'nosniff');
