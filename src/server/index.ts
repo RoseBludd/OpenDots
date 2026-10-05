@@ -8,6 +8,8 @@ import { Runner } from './runner.js';
 import { createApp } from './app.js';
 import { WorkspaceStore } from './workspace.js';
 import { Platform } from './platform.js';
+import { FamilyStore } from './family-store.js';
+import { familyRoutes } from './family-routes.js';
 import type { PlatformConfig } from './platform-config.js';
 import { AuthStore } from './auth-store.js';
 import {
@@ -44,6 +46,7 @@ const workspace = new WorkspaceStore(
 );
 
 let auth: AuthStore | undefined;
+let familyStore: FamilyStore | undefined;
 if (familyMode) {
   const sessionSecret = process.env.SESSION_SECRET;
   if (!sessionSecret || sessionSecret.length < 32)
@@ -54,6 +57,8 @@ if (familyMode) {
     process.env.AUTH_DATABASE_PATH ??
     database.replace(/\.sqlite$/i, '-auth.sqlite');
   auth = new AuthStore(authPath, sessionSecret);
+  familyStore = new FamilyStore(authPath);
+  familyStore.userLookup = auth.userById;
   storageAdapterFromEnv();
   const pkgPath = process.env.FAMILY_PACKAGE_PATH;
   if (pkgPath) applyFamilyPackage(store, workspace, loadFamilyPackage(pkgPath));
@@ -138,6 +143,8 @@ const app = createApp({
   auth,
   familyMode,
 });
+if (familyStore && auth)
+  app.route('/api/family', familyRoutes(familyStore, auth, origin));
 
 app.use('*', async (c, next) => {
   c.header('X-Content-Type-Options', 'nosniff');
