@@ -27,6 +27,7 @@ import type {
   Conversation,
   Detail,
   Dot,
+  FamilyUser,
   Result,
   State,
   WorkspaceState,
@@ -97,7 +98,10 @@ export function App() {
   const [familyEmail, setFamilyEmail] = useState('');
   const [familyPassword, setFamilyPassword] = useState('');
   const [familyName, setFamilyName] = useState('');
+  const [familyJoinCode, setFamilyJoinCode] = useState('');
+  const [familyJoinMode, setFamilyJoinMode] = useState(false);
   const [familyBootstrap, setFamilyBootstrap] = useState<boolean | null>(null);
+  const [familyUser, setFamilyUser] = useState<FamilyUser | null>(null);
   const [needsAuth, setNeedsAuth] = useState(false);
   const [dialog, setDialog] = useState<Dialog>();
   const [mobile, setMobile] = useState(false);
@@ -137,11 +141,19 @@ export function App() {
       })
       .catch(() => setFamilyBootstrap(null));
   }, []);
+  const refreshFamilyUser = useCallback(() => {
+    void api<{ user: FamilyUser }>('/auth/me')
+      .then(({ user }) => setFamilyUser(user))
+      .catch(() => setFamilyUser(null));
+  }, []);
   useEffect(() => {
     void refresh();
     const timer = setInterval(() => void refresh(), 3000);
     return () => clearInterval(timer);
   }, [refresh]);
+  useEffect(() => {
+    if (!needsAuth && familyBootstrap !== null) refreshFamilyUser();
+  }, [needsAuth, familyBootstrap, refreshFamilyUser]);
   useEffect(() => {
     setCapture(undefined);
     if (!selectedThread) return;
@@ -221,24 +233,59 @@ export function App() {
         <p>
           {familyBootstrap
             ? 'Create the first guardian account for your family home.'
-            : 'Sign in with your family email and password.'}
+            : familyJoinMode
+              ? 'Join with the code a guardian gave you.'
+              : 'Sign in with your family email and password.'}
         </p>
+        {!familyBootstrap && (
+          <div className="auth-mode-toggle" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={!familyJoinMode}
+              className={familyJoinMode ? '' : 'active'}
+              onClick={() => {
+                setFamilyJoinMode(false);
+                setError('');
+              }}
+            >
+              Sign in
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={familyJoinMode}
+              className={familyJoinMode ? 'active' : ''}
+              onClick={() => {
+                setFamilyJoinMode(true);
+                setError('');
+              }}
+            >
+              Join family
+            </button>
+          </div>
+        )}
         <form
           onSubmit={async (e) => {
             e.preventDefault();
             setError('');
-            const path = familyBootstrap ? '/auth/register' : '/auth/login';
-            const body = familyBootstrap
-              ? {
-                  name: familyName.trim() || 'Guardian',
-                  email: familyEmail.trim(),
-                  password: familyPassword,
-                }
-              : { email: familyEmail.trim(), password: familyPassword };
+            const joining = !familyBootstrap && familyJoinMode;
+            const path =
+              familyBootstrap || joining ? '/auth/register' : '/auth/login';
+            const body =
+              familyBootstrap || joining
+                ? {
+                    name: familyName.trim() || 'Guardian',
+                    email: familyEmail.trim(),
+                    password: familyPassword,
+                    ...(joining ? { joinCode: familyJoinCode.trim() } : {}),
+                  }
+                : { email: familyEmail.trim(), password: familyPassword };
             try {
               await api(path, 'POST', body);
               setError('');
               await refresh();
+              refreshFamilyUser();
             } catch (err) {
               setError(
                 err instanceof Error
@@ -248,7 +295,7 @@ export function App() {
             }
           }}
         >
-          {familyBootstrap && (
+          {(familyBootstrap || familyJoinMode) && (
             <input
               type="text"
               aria-label="Your name"
@@ -272,7 +319,9 @@ export function App() {
             type="password"
             aria-label="Password"
             autoComplete={
-              familyBootstrap ? 'new-password' : 'current-password'
+              familyBootstrap || familyJoinMode
+                ? 'new-password'
+                : 'current-password'
             }
             placeholder="Password (8+ characters)"
             value={familyPassword}
@@ -280,8 +329,23 @@ export function App() {
             minLength={8}
             required
           />
+          {familyJoinMode && !familyBootstrap && (
+            <input
+              type="text"
+              aria-label="Join code"
+              placeholder="Join code (from a guardian)"
+              value={familyJoinCode}
+              onChange={(e) => setFamilyJoinCode(e.target.value)}
+              maxLength={16}
+              required
+            />
+          )}
           <button className="primary">
-            {familyBootstrap ? 'Create family home' : 'Sign in'}
+            {familyBootstrap
+              ? 'Create family home'
+              : familyJoinMode
+                ? 'Join family'
+                : 'Sign in'}
           </button>
         </form>
         {error && (
@@ -385,6 +449,22 @@ export function App() {
         <button aria-label="Open activity" onClick={() => setView('tasks')}>
           <Clock3 size={18} />
         </button>
+        {familyUser && (
+          <button
+            className="rail-avatar"
+            aria-label={`${familyUser.name} (open family settings)`}
+            onClick={() => setDialog({ type: 'settings' })}
+          >
+            {familyUser.avatarPath ? (
+              <img
+                src={`/api/auth/avatar/${familyUser.id}?t=${familyUser.avatarUpdatedAt ?? 0}`}
+                alt=""
+              />
+            ) : (
+              <span>{familyUser.name.charAt(0).toUpperCase()}</span>
+            )}
+          </button>
+        )}
         <button
           className="rail-settings"
           aria-label="Open settings"
@@ -978,6 +1058,8 @@ export function App() {
           workspace={workspace}
           onClose={() => setDialog(undefined)}
           mutate={mutate}
+          familyUser={familyUser}
+          onFamilyUserChange={refreshFamilyUser}
         />
       )}
     </div>

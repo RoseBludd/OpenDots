@@ -116,3 +116,22 @@ export interface WorkspaceState {
   setup: SetupStatus;
   calls: CallReceipt[];
 }
+export type FamilyRole = 'guardian' | 'adult' | 'kid';
+export interface FamilyUser {
+  id: string;
+  name: string;
+  email?: string;
+  role: FamilyRole;
+  createdAt?: number;
+  avatarPath?: string | null;
+  avatarUpdatedAt?: number | null;
+}
+export interface JoinCodeRecord {
+  id: string;
+  role: 'adult' | 'kid';
+  createdAt: number;
+  expiresAt: number;
+  createdByUserId: string;
+  usedByUserId: string | null;
+  revokedAt: number | null;
+}

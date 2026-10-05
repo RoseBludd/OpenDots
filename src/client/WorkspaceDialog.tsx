@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
-import type { Dot, Memory, State, WorkspaceState } from '../shared/types';
+import type {
+  Dot,
+  FamilyUser,
+  JoinCodeRecord,
+  Memory,
+  State,
+  WorkspaceState,
+} from '../shared/types';
+import { api } from './api';
 export type Dialog =
   | { type: 'space' }
   | { type: 'dot'; dot?: Dot; spaceId: string }
@@ -13,12 +21,16 @@ export function WorkspaceDialog({
   workspace,
   onClose,
   mutate,
+  familyUser,
+  onFamilyUserChange,
 }: {
   dialog: Dialog;
   state: State;
   workspace: WorkspaceState;
   onClose: () => void;
   mutate: (path: string, method: string, body?: unknown) => Promise<boolean>;
+  familyUser?: FamilyUser | null;
+  onFamilyUserChange?: () => void;
 }) {
   const [name, setName] = useState(
     dialog.type === 'dot' ? (dialog.dot?.name ?? '') : '',
@@ -55,6 +67,67 @@ export function WorkspaceDialog({
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const isGuardian = familyUser?.role === 'guardian';
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [avatarError, setAvatarError] = useState('');
+  const [members, setMembers] = useState<FamilyUser[]>([]);
+  const [codes, setCodes] = useState<JoinCodeRecord[]>([]);
+  const [familyError, setFamilyError] = useState('');
+  const [newCodeRole, setNewCodeRole] = useState<'adult' | 'kid'>('adult');
+  const [generatedCode, setGeneratedCode] = useState('');
+  const [codeBusy, setCodeBusy] = useState(false);
+  const loadFamily = () => {
+    void api<{ users: FamilyUser[] }>('/auth/members')
+      .then((r) => setMembers(r.users))
+      .catch((e) => setFamilyError(e instanceof Error ? e.message : ''));
+    void api<{ codes: JoinCodeRecord[] }>('/auth/join-codes')
+      .then((r) => setCodes(r.codes))
+      .catch((e) => setFamilyError(e instanceof Error ? e.message : ''));
+  };
+  useEffect(() => {
+    if (dialog.type === 'settings' && isGuardian) loadFamily();
+  }, [dialog.type, isGuardian]);
+  const uploadAvatar = (file: File) => {
+    setAvatarError('');
+    setAvatarBusy(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      void api('/auth/avatar', 'POST', { dataUrl: reader.result })
+        .then(() => onFamilyUserChange?.())
+        .catch((e) =>
+          setAvatarError(e instanceof Error ? e.message : 'Could not upload.'),
+        )
+        .finally(() => setAvatarBusy(false));
+    };
+    reader.onerror = () => {
+      setAvatarError('Could not read that file.');
+      setAvatarBusy(false);
+    };
+    reader.readAsDataURL(file);
+  };
+  const generateCode = () => {
+    setCodeBusy(true);
+    setFamilyError('');
+    void api<{ code: string }>('/auth/join-codes', 'POST', {
+      role: newCodeRole,
+    })
+      .then((r) => {
+        setGeneratedCode(r.code);
+        loadFamily();
+      })
+      .catch((e) =>
+        setFamilyError(e instanceof Error ? e.message : 'Could not generate.'),
+      )
+      .finally(() => setCodeBusy(false));
+  };
+  const revokeCode = (id: string) => {
+    setFamilyError('');
+    void api(`/auth/join-codes/${id}`, 'DELETE')
+      .then(() => loadFamily())
+      .catch((e) =>
+        setFamilyError(e instanceof Error ? e.message : 'Could not revoke.'),
+      );
+  };
   const container = useRef<HTMLElement>(null);
   useEffect(() => {
     const previous =
@@ -380,6 +453,118 @@ export function WorkspaceDialog({
               >
                 Template setup guide ↗
               </a>
+            </div>
+          )}
+          {dialog.type === 'settings' && familyUser && (
+            <div className="family-section">
+              <h3>Your profile</h3>
+              <div className="family-avatar-row">
+                <span className="avatar-circle">
+                  {familyUser.avatarPath ? (
+                    <img
+                      src={`/api/auth/avatar/${familyUser.id}?t=${familyUser.avatarUpdatedAt ?? 0}`}
+                      alt=""
+                    />
+                  ) : (
+                    <span>{familyUser.name.charAt(0).toUpperCase()}</span>
+                  )}
+                </span>
+                <label className="field-label" htmlFor="avatar-upload">
+                  {avatarBusy ? 'Uploading…' : 'Change photo'}
+                  <input
+                    id="avatar-upload"
+                    type="file"
+                    accept="image/png,image/jpeg"
+                    disabled={avatarBusy}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) uploadAvatar(file);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+              </div>
+              {avatarError && (
+                <p className="chat-error" role="alert">
+                  {avatarError}
+                </p>
+              )}
+            </div>
+          )}
+          {dialog.type === 'settings' && isGuardian && (
+            <div className="family-section">
+              <h3>Family members</h3>
+              {members.map((member) => (
+                <div className="member-row" key={member.id}>
+                  <span className="avatar-circle">
+                    {member.avatarPath ? (
+                      <img
+                        src={`/api/auth/avatar/${member.id}?t=${member.avatarUpdatedAt ?? 0}`}
+                        alt=""
+                      />
+                    ) : (
+                      <span>{member.name.charAt(0).toUpperCase()}</span>
+                    )}
+                  </span>
+                  <span className="member-info">
+                    <strong>{member.name}</strong>
+                    {member.email && <small>{member.email}</small>}
+                  </span>
+                  <span className="role-badge">{member.role}</span>
+                </div>
+              ))}
+              <h3>Join codes</h3>
+              <div className="join-code-generator">
+                <select
+                  value={newCodeRole}
+                  onChange={(e) =>
+                    setNewCodeRole(e.target.value as 'adult' | 'kid')
+                  }
+                >
+                  <option value="adult">Adult</option>
+                  <option value="kid">Kid</option>
+                </select>
+                <button
+                  type="button"
+                  className="primary"
+                  disabled={codeBusy}
+                  onClick={generateCode}
+                >
+                  {codeBusy ? 'Generating…' : 'Generate join code'}
+                </button>
+              </div>
+              {generatedCode && (
+                <p className="join-code-display">
+                  Share this code: <code>{generatedCode}</code>
+                </p>
+              )}
+              {codes.map((code) => {
+                const status = code.revokedAt
+                  ? 'Revoked'
+                  : code.usedByUserId
+                    ? 'Used'
+                    : code.expiresAt < Date.now()
+                      ? 'Expired'
+                      : 'Active';
+                return (
+                  <div className="join-code-item" key={code.id}>
+                    <span>{code.role}</span>
+                    <span className={status === 'Active' ? '' : 'status-used'}>
+                      {status}
+                    </span>
+                    {status === 'Active' && (
+                      <button type="button" onClick={() => revokeCode(code.id)}>
+                        Revoke
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+              {familyError && (
+                <p className="chat-error" role="alert">
+                  {familyError}
+                </p>
+              )}
             </div>
           )}
           {dialog.type === 'memory' && (
