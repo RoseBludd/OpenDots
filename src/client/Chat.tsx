@@ -237,6 +237,7 @@ export function Chat({
       <header className="chat-persona">
         <Mascot
           identity={dot.id}
+          character={dot.avatar}
           name={dot.name}
           small
           state={running ? 'working' : paused ? 'paused' : 'idle'}

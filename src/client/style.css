@@ -4193,3 +4193,68 @@ h3 {
   font-size: 14px;
   color: #c9e8dd;
 }
+
+.character-picker {
+  border: 1px solid #e5e5e5;
+  border-radius: 10px;
+  margin: 14px 0;
+  padding: 10px 12px;
+}
+.character-picker legend {
+  font-weight: 600;
+}
+.character-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.character-option {
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  cursor: pointer;
+}
+.character-option .mascot.small {
+  width: 44px;
+  height: 44px;
+}
+.character-option.auto {
+  width: auto;
+  padding: 0 14px;
+  color: var(--muted);
+}
+.character-option.selected {
+  border-color: var(--blue);
+  background: var(--lavender);
+}
+.danger-zone {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.danger-link,
+.danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #b3261e;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 4px 0;
+}
+.danger {
+  border: 1px solid #b3261e;
+  border-radius: 8px;
+  padding: 7px 14px;
+}
+.danger-actions {
+  display: flex;
+  gap: 10px;
+}

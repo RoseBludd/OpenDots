@@ -537,7 +537,13 @@ export function App() {
                 }
                 onClick={() => chooseDot(item)}
               >
-                <Mascot identity={item.id} name={item.name} small decorative />
+                <Mascot
+                  identity={item.id}
+                  character={item.avatar}
+                  name={item.name}
+                  small
+                  decorative
+                />
                 <span>{item.name}</span>
               </button>
               <button
@@ -753,6 +759,7 @@ export function App() {
                   <div className="empty-chat-persona">
                     <Mascot
                       identity={dot.id}
+                      character={dot.avatar}
                       name={dot.name}
                       state={state.settings.paused ? 'paused' : 'idle'}
                     />

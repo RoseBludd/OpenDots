@@ -81,6 +81,8 @@ export interface Dot {
   createdAt: number;
   learningContainerId?: string | null;
   skillDeliveryEnabled?: boolean;
+  /** Chosen mascot; null/undefined falls back to a stable per-Dot default. */
+  avatar?: string | null;
 }
 export interface Conversation {
   id: string;

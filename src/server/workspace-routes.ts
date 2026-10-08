@@ -15,6 +15,7 @@ const dotSchema = z
     memoryAllowed: z.boolean(),
     learningContainerId: learningContainerIdSchema.optional(),
     skillDeliveryEnabled: z.boolean().optional(),
+    avatar: z.enum(['blue', 'mint', 'orange', 'purple']).nullable().optional(),
     spaceIds: z.array(z.string().min(1)).min(1).max(100).optional(),
     spaceId: z.string().min(1).optional(),
   })
@@ -87,9 +88,21 @@ export function workspaceRoutes(platform: Platform, voice: VoiceService) {
         data.data.spaceIds,
         data.data.learningContainerId,
         data.data.skillDeliveryEnabled,
+        data.data.avatar ?? null,
       ),
       201,
     );
+  });
+  app.delete('/dots/:id', async (c) => {
+    const id = c.req.param('id');
+    if (!platform.workspace.dot(id))
+      return c.json({ error: 'Dot not found.' }, 404);
+    if (platform.workspace.dots().length <= 1)
+      return c.json({ error: 'Keep at least one Dot in your workspace.' }, 400);
+    // Best effort: stop the Dot's computer so it does not linger after deletion.
+    await platform.computers.stop(id).catch(() => undefined);
+    platform.workspace.deleteDot(id);
+    return c.json({ ok: true });
   });
   app.put('/dots/:id', async (c) => {
     const data = dotSchema.safeParse(await c.req.json());

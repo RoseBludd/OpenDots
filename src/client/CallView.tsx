@@ -62,7 +62,7 @@ export function CallView({
         </button>
       </div>
       <div className={`call-persona ${voice.phase}`}>
-        <Mascot identity={dot.id} name={dot.name} />
+        <Mascot identity={dot.id} character={dot.avatar} name={dot.name} />
         <h2>{dot.name}</h2>
         <span className="call-timer" aria-label="Call duration">
           {duration}

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
+import { Mascot, characters } from './Mascot';
 import type {
   Dot,
   FamilyUser,
@@ -65,6 +66,10 @@ export function WorkspaceDialog({
   const [skillDelivery, setSkillDelivery] = useState(
     dialog.type === 'dot' ? (dialog.dot?.skillDeliveryEnabled ?? false) : false,
   );
+  const [avatar, setAvatar] = useState<string | null>(
+    dialog.type === 'dot' ? (dialog.dot?.avatar ?? null) : null,
+  );
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const isGuardian = familyUser?.role === 'guardian';
@@ -215,6 +220,7 @@ export function WorkspaceDialog({
                 memoryAllowed: memory,
                 learningContainerId: learningContainer.trim() || null,
                 skillDeliveryEnabled: skillDelivery,
+                avatar,
               };
             }
             if (dialog.type === 'settings') {
@@ -256,6 +262,33 @@ export function WorkspaceDialog({
                 required
               />
             </>
+          )}
+          {dialog.type === 'dot' && (
+            <fieldset className="character-picker">
+              <legend>Character</legend>
+              <div className="character-options">
+                {characters.map((character) => (
+                  <button
+                    type="button"
+                    key={character}
+                    className={`character-option ${avatar === character ? 'selected' : ''}`}
+                    aria-pressed={avatar === character}
+                    aria-label={`Choose the ${character} character`}
+                    onClick={() => setAvatar(character)}
+                  >
+                    <Mascot character={character} small decorative />
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className={`character-option auto ${avatar === null ? 'selected' : ''}`}
+                  aria-pressed={avatar === null}
+                  onClick={() => setAvatar(null)}
+                >
+                  Auto
+                </button>
+              </div>
+            </fieldset>
           )}
           {dialog.type !== 'settings' && (
             <>
@@ -582,6 +615,52 @@ export function WorkspaceDialog({
             {busy ? 'Saving…' : 'Save'}
           </button>
         </form>
+        {dialog.type === 'dot' && dialog.dot && (
+          <div className="danger-zone">
+            {workspace.dots.length <= 1 ? (
+              <p className="muted">Keep at least one Dot in your workspace.</p>
+            ) : confirmDelete ? (
+              <>
+                <p role="alert">
+                  Delete {dialog.dot.name} and its{' '}
+                  {
+                    workspace.conversations.filter(
+                      (item) => item.dotId === dialog.dot!.id,
+                    ).length
+                  }{' '}
+                  conversation(s)? This can’t be undone.
+                </p>
+                <div className="danger-actions">
+                  <button
+                    type="button"
+                    className="danger"
+                    disabled={busy}
+                    onClick={async () => {
+                      setBusy(true);
+                      if (await mutate(`/dots/${dialog.dot!.id}`, 'DELETE'))
+                        onClose();
+                      else setError('Could not delete this Dot.');
+                      setBusy(false);
+                    }}
+                  >
+                    {busy ? 'Deleting…' : 'Yes, delete'}
+                  </button>
+                  <button type="button" onClick={() => setConfirmDelete(false)}>
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="danger-link"
+                onClick={() => setConfirmDelete(true)}
+              >
+                <Trash2 size={14} /> Delete this Dot
+              </button>
+            )}
+          </div>
+        )}
       </section>
     </div>
   );

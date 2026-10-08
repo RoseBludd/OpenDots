@@ -26,6 +26,7 @@ export class WorkspaceStore {
     for (const [table, column, definition] of [
       ['dots', 'learningContainerId', 'TEXT'],
       ['dots', 'skillDeliveryEnabled', 'INTEGER NOT NULL DEFAULT 0'],
+      ['dots', 'avatar', 'TEXT'],
       ['thread_bindings', 'learningContainerId', 'TEXT'],
     ]) {
       if (
@@ -136,6 +137,7 @@ export class WorkspaceStore {
     spaceIds: string[] = [spaceId],
     learningContainerId: string | null = null,
     skillDeliveryEnabled = false,
+    avatar: string | null = null,
   ): Dot {
     this.validateSpaceAccess(spaceId, spaceIds);
     validateLearningSettings(learningContainerId, skillDeliveryEnabled);
@@ -149,13 +151,14 @@ export class WorkspaceStore {
       memoryAllowed,
       learningContainerId,
       skillDeliveryEnabled,
+      avatar,
       createdAt: Date.now(),
     };
     this.db.exec('BEGIN');
     try {
       this.db
         .prepare(
-          'INSERT INTO dots (id, spaceId, name, instructions, researchAllowed, memoryAllowed, createdAt, learningContainerId, skillDeliveryEnabled) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          'INSERT INTO dots (id, spaceId, name, instructions, researchAllowed, memoryAllowed, createdAt, learningContainerId, skillDeliveryEnabled, avatar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         )
         .run(
           dot.id,
@@ -167,6 +170,7 @@ export class WorkspaceStore {
           dot.createdAt,
           learningContainerId,
           +skillDeliveryEnabled,
+          avatar,
         );
       for (const id of dot.spaceIds)
         this.db.prepare('INSERT INTO dot_spaces VALUES (?, ?)').run(dot.id, id);
@@ -199,6 +203,7 @@ export class WorkspaceStore {
       spaceIds?: string[];
       learningContainerId?: string | null;
       skillDeliveryEnabled?: boolean;
+      avatar?: string | null;
     },
   ): Dot {
     const current = this.dot(id);
@@ -217,7 +222,7 @@ export class WorkspaceStore {
     try {
       this.db
         .prepare(
-          'UPDATE dots SET name=?, instructions=?, researchAllowed=?, memoryAllowed=?, learningContainerId=?, skillDeliveryEnabled=? WHERE id=?',
+          'UPDATE dots SET name=?, instructions=?, researchAllowed=?, memoryAllowed=?, learningContainerId=?, skillDeliveryEnabled=?, avatar=? WHERE id=?',
         )
         .run(
           patch.name,
@@ -226,6 +231,7 @@ export class WorkspaceStore {
           +patch.memoryAllowed,
           learningContainerId,
           +skillDeliveryEnabled,
+          patch.avatar === undefined ? (current.avatar ?? null) : patch.avatar,
           id,
         );
       this.db
@@ -240,6 +246,35 @@ export class WorkspaceStore {
       throw error;
     }
     return this.dot(id)!;
+  }
+  /** Removes a Dot with its local conversation bindings, calls, tasks and page threads. */
+  deleteDot(id: string) {
+    if (!this.dot(id)) throw new Error('Dot not found.');
+    if (this.dots().length <= 1)
+      throw new Error('Dot: keep at least one Dot in your workspace.');
+    const threads = this.db
+      .prepare('SELECT id FROM thread_bindings WHERE dotId=?')
+      .all(id)
+      .map((row) => String(row.id));
+    this.db.exec('BEGIN');
+    try {
+      for (const threadId of threads) {
+        this.db.prepare('DELETE FROM calls WHERE threadId=?').run(threadId);
+        this.db
+          .prepare('DELETE FROM task_threads WHERE threadId=?')
+          .run(threadId);
+        this.db.prepare('DELETE FROM captures WHERE threadId=?').run(threadId);
+      }
+      this.db.prepare('DELETE FROM page_threads WHERE dotId=?').run(id);
+      this.db.prepare('DELETE FROM thread_bindings WHERE dotId=?').run(id);
+      this.db.prepare('DELETE FROM dot_spaces WHERE dotId=?').run(id);
+      this.db.prepare('DELETE FROM computer_permissions WHERE dotId=?').run(id);
+      this.db.prepare('DELETE FROM dots WHERE id=?').run(id);
+      this.db.exec('COMMIT');
+    } catch (error) {
+      this.db.exec('ROLLBACK');
+      throw error;
+    }
   }
   conversations(): Conversation[] {
     return this.db
