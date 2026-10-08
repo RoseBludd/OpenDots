@@ -40,6 +40,16 @@ docker compose -f compose.yml -f compose.computers.yml -f compose.computers-app.
 
 Here, the app addresses computers by their container names. Computers have no published host ports. The supervisor lives on a separate control network, and only the supervisor mounts the Docker socket. Neither the web app nor a Dot's computer receives that socket. Changing the namespace changes which containers and volumes are selected; keep it stable and unique for each deployment.
 
+## Mount host folders per Dot
+
+Set `COMPUTER_EXTRA_BINDS` in `.env` to give a Dot access to a host folder. Entries are `|`-separated `[dotId=]host:container[:ro|rw]`, and the container path must be under `/workspace/genius`:
+
+```dotenv
+COMPUTER_EXTRA_BINDS=roofers=/c/Users/GENIUS/Rooferzs:/workspace/genius/project|/srv/shared:/workspace/genius/shared:ro
+```
+
+An entry with a `dotId=` prefix mounts only into that Dot's computer; an entry without one mounts into every Dot, which breaks the per-Dot file isolation described below for that folder. Prefer `:ro` unless the Dot must write. Binds apply when a computer container is created, so after changing them rebuild/restart the supervisor and remove that Dot's container (volumes are retained) before starting it again.
+
 ## Use the computer
 
 - **Browser:** navigate and inspect the current page, including screenshots and element snapshots. Browser profiles keep cookies and logins across container restarts.
