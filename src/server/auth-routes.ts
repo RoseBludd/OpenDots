@@ -18,7 +18,12 @@ const credentials = z
 const joinCodeRequest = z
   .object({
     role: z.enum(['adult', 'kid']),
-    expiresInHours: z.number().int().min(1).max(24 * 30).optional(),
+    expiresInHours: z
+      .number()
+      .int()
+      .min(1)
+      .max(24 * 30)
+      .optional(),
   })
   .strict();
 
@@ -55,7 +60,10 @@ export function authRoutes(auth: AuthStore, origin?: string) {
   app.post('/register', async (c) => {
     const parsed = credentials.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success)
-      return c.json({ error: 'Enter your name, email, and an 8+ character password.' }, 400);
+      return c.json(
+        { error: 'Enter your name, email, and an 8+ character password.' },
+        400,
+      );
     if (auth.userByEmail(parsed.data.email))
       return c.json({ error: 'That email is already in use.' }, 409);
 
@@ -66,18 +74,28 @@ export function authRoutes(auth: AuthStore, origin?: string) {
     } else {
       if (!parsed.data.joinCode)
         return c.json(
-          { error: 'Family is already set up. Ask a guardian for a join code.' },
+          {
+            error: 'Family is already set up. Ask a guardian for a join code.',
+          },
           403,
         );
       const redeemed = auth.redeemJoinCode(parsed.data.joinCode);
       if (!redeemed)
-        return c.json({ error: 'That join code is invalid, used, or expired.' }, 400);
+        return c.json(
+          { error: 'That join code is invalid, used, or expired.' },
+          400,
+        );
       role = redeemed.role;
       joinCodeId = redeemed.codeId;
     }
 
     const name = parsed.data.name ?? 'Guardian';
-    const user = auth.createUser(name, parsed.data.email, parsed.data.password, role);
+    const user = auth.createUser(
+      name,
+      parsed.data.email,
+      parsed.data.password,
+      role,
+    );
     if (joinCodeId) auth.markJoinCodeUsed(joinCodeId, user.id);
     const token = auth.createSession(user.id);
     setCookie(c, auth.cookieName(), token, {
@@ -96,7 +114,8 @@ export function authRoutes(auth: AuthStore, origin?: string) {
     if (!parsed.success)
       return c.json({ error: 'Enter a valid email and password.' }, 400);
     const user = auth.verifyLogin(parsed.data.email, parsed.data.password);
-    if (!user) return c.json({ error: 'Email or password was not recognized.' }, 401);
+    if (!user)
+      return c.json({ error: 'Email or password was not recognized.' }, 401);
     const token = auth.createSession(user.id);
     setCookie(c, auth.cookieName(), token, {
       httpOnly: true,
@@ -124,7 +143,9 @@ export function authRoutes(auth: AuthStore, origin?: string) {
     const parsed = credentials.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success || !parsed.data.name)
       return c.json(
-        { error: 'Provide name, email, password, and role for the new member.' },
+        {
+          error: 'Provide name, email, password, and role for the new member.',
+        },
         400,
       );
     const role = (parsed.data.role ?? 'adult') as UserRole;
@@ -150,7 +171,9 @@ export function authRoutes(auth: AuthStore, origin?: string) {
     if (!actor) return c.json({ error: 'Not signed in.' }, 401);
     if (actor.role !== 'guardian')
       return c.json({ error: 'Only a guardian can create join codes.' }, 403);
-    const parsed = joinCodeRequest.safeParse(await c.req.json().catch(() => null));
+    const parsed = joinCodeRequest.safeParse(
+      await c.req.json().catch(() => null),
+    );
     if (!parsed.success)
       return c.json({ error: 'Provide a role of adult or kid.' }, 400);
     const { code, record } = auth.createJoinCode(
@@ -173,20 +196,26 @@ export function authRoutes(auth: AuthStore, origin?: string) {
     if (actor.role !== 'guardian')
       return c.json({ error: 'Only a guardian can revoke join codes.' }, 403);
     const ok = auth.revokeJoinCode(c.req.param('id'));
-    return ok ? c.json({ ok: true }) : c.json({ error: 'Code not found or already used.' }, 404);
+    return ok
+      ? c.json({ ok: true })
+      : c.json({ error: 'Code not found or already used.' }, 404);
   });
   app.post('/avatar', async (c) => {
     const actor = auth.userFromContext(c);
     if (!actor) return c.json({ error: 'Not signed in.' }, 401);
     const parsed = avatarUpload.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return c.json({ error: 'Provide an image dataUrl.' }, 400);
+    if (!parsed.success)
+      return c.json({ error: 'Provide an image dataUrl.' }, 400);
     const match = /^data:([^;]+);base64,(.+)$/.exec(parsed.data.dataUrl);
     const ext = match && AVATAR_MIME_EXT[match[1]!];
     if (!match || !ext)
       return c.json({ error: 'Only PNG or JPEG images are supported.' }, 400);
     const buf = Buffer.from(match[2]!, 'base64');
     if (buf.length === 0 || buf.length > AVATAR_MAX_BYTES)
-      return c.json({ error: 'Image must be a non-empty file up to 2MB.' }, 400);
+      return c.json(
+        { error: 'Image must be a non-empty file up to 2MB.' },
+        400,
+      );
     const current = auth.userById(actor.id);
     if (current?.avatarPath) {
       await unlink(current.avatarPath).catch(() => {});

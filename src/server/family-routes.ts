@@ -1,6 +1,12 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import type { FamilyStore, FamilyUser, Memory, Visibility, Share } from './family-store.js';
+import type {
+  FamilyStore,
+  FamilyUser,
+  Memory,
+  Visibility,
+  Share,
+} from './family-store.js';
 import type { AuthStore } from './auth-store.js';
 
 const memoryInput = z
@@ -8,7 +14,11 @@ const memoryInput = z
     title: z.string().trim().min(1).max(200),
     body: z.string().max(5_000).optional().default(''),
     visibility: z.enum(['private', 'family', 'public']),
-    occurredAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+    occurredAt: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional()
+      .nullable(),
     peopleIds: z.array(z.string()).optional(),
   })
   .strict();
@@ -78,9 +88,13 @@ export function familyRoutes(
     if (!actor) return c.json({ error: 'Not signed in.' }, 401);
     const parsed = memoryInput.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success)
-      return c.json({ error: 'Enter a title, visibility, and optional date.' }, 400);
+      return c.json(
+        { error: 'Enter a title, visibility, and optional date.' },
+        400,
+      );
     const person = familyStore.personByUserId(actor.id);
-    const peopleIds = parsed.data.peopleIds?.filter((id) => familyStore.personById(id)) ?? [];
+    const peopleIds =
+      parsed.data.peopleIds?.filter((id) => familyStore.personById(id)) ?? [];
     const memory = familyStore.createMemory({
       ownerUserId: actor.id,
       ownerName: actor.name,
@@ -115,22 +129,38 @@ export function familyRoutes(
     const parsed = z
       .object({
         personId: z.string().optional().nullable(),
-        scope: z.enum(['person', 'group', 'family']).optional().default('person'),
+        scope: z
+          .enum(['person', 'group', 'family'])
+          .optional()
+          .default('person'),
       })
       .strict()
       .safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return c.json({ error: 'Specify scope (person/group/family); optional personId.' }, 400);
+    if (!parsed.success)
+      return c.json(
+        { error: 'Specify scope (person/group/family); optional personId.' },
+        400,
+      );
     const memory = familyStore.getMemory(c.req.param('id'));
     if (!memory || memory.ownerUserId !== actor.id)
       return c.json({ error: 'Memory not found or not yours.' }, 404);
-    const share = familyStore.grantShare(c.req.param('id'), actor.id, parsed.data.personId, parsed.data.scope);
-    return share ? c.json({ share }, 200) : c.json({ error: 'Share not created.' }, 400);
+    const share = familyStore.grantShare(
+      c.req.param('id'),
+      actor.id,
+      parsed.data.personId,
+      parsed.data.scope,
+    );
+    return share
+      ? c.json({ share }, 200)
+      : c.json({ error: 'Share not created.' }, 400);
   });
 
   app.delete('/shares/:id', async (c) => {
     const actor = auth?.userFromContext(c);
     if (!actor) return c.json({ error: 'Not signed in.' }, 401);
-    const share = familyStore.listShares(c.req.param('id').split('#')[0] as any)?.find((s) => s.id === c.req.param('id'));
+    const share = familyStore
+      .listShares(c.req.param('id').split('#')[0] as any)
+      ?.find((s) => s.id === c.req.param('id'));
     if (!share) return c.json({ error: 'Share not found.' }, 404);
     if (!familyStore.revokeShare(c.req.param('id'), actor.id))
       return c.json({ error: 'You did not grant this share.' }, 403);
@@ -140,8 +170,17 @@ export function familyRoutes(
   app.post('/subscribe', async (c) => {
     const actor = auth?.userFromContext(c);
     if (!actor) return c.json({ error: 'Not signed in.' }, 401);
-    const parsed = z.object({ personId: z.string().optional().nullable() }).strict().safeParse(c.req.json().catch(() => null));
-    if (!parsed.success) return c.json({ error: 'Optional personId (person or group) or omit for family-wide.' }, 400);
+    const parsed = z
+      .object({ personId: z.string().optional().nullable() })
+      .strict()
+      .safeParse(c.req.json().catch(() => null));
+    if (!parsed.success)
+      return c.json(
+        {
+          error: 'Optional personId (person or group) or omit for family-wide.',
+        },
+        400,
+      );
     familyStore.subscribe(actor.id, parsed.data.personId ?? null);
     return c.json({ ok: true });
   });
@@ -149,7 +188,10 @@ export function familyRoutes(
   app.delete('/unsubscribe', async (c) => {
     const actor = auth?.userFromContext(c);
     if (!actor) return c.json({ error: 'Not signed in.' }, 401);
-    const parsed = z.object({ personId: z.string().optional().nullable() }).strict().safeParse(c.req.json().catch(() => null));
+    const parsed = z
+      .object({ personId: z.string().optional().nullable() })
+      .strict()
+      .safeParse(c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: 'Optional personId.' }, 400);
     if (!familyStore.unsubscribe(actor.id, parsed.data.personId ?? null))
       return c.json({ error: 'Subscription not found.' }, 404);
