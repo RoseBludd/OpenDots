@@ -2,6 +2,13 @@ import { PageReviewCard } from './PageReviewCard';
 import { pageReviewSchema, pageReviewTool } from '../shared/page-review';
 import { contextualMessage, type PageContext } from './page-context';
 import { api } from './api';
+import {
+  attachmentSize,
+  MAX_ATTACHMENT_BYTES,
+  messageContent,
+  readAttachment,
+  type Attachment,
+} from './attachments';
 import type { Page } from '../server/pages';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -13,6 +20,7 @@ import {
 } from '@copilotkit/react-core/v2';
 import {
   FilePlus,
+  Paperclip,
   ArrowUp,
   Clock3,
   Link2,
@@ -92,6 +100,27 @@ export function Chat({
   const [draft, setDraft] = useState('');
   const [source, setSource] = useState('');
   const [sourceOpen, setSourceOpen] = useState(false);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [dragging, setDragging] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const addFiles = async (files: File[]) => {
+    setError('');
+    const next = [...attachments];
+    for (const file of files) {
+      try {
+        next.push(await readAttachment(file));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Could not attach file.');
+      }
+    }
+    if (attachmentSize(next) > MAX_ATTACHMENT_BYTES) {
+      setError(
+        'Attachments are too large (about 700KB total). Remove some or use smaller files.',
+      );
+      return;
+    }
+    setAttachments(next);
+  };
   const [error, setError] = useState('');
   const [loaded, setLoaded] = useState(false);
   const [running, setRunning] = useState(false);
@@ -136,15 +165,26 @@ export function Chat({
     };
   }, [agent, copilotkit, isReady]);
   const send = async (text: string) => {
-    if (!text.trim() || running || !loaded || !contextReady || paused) return;
+    if (
+      (!text.trim() && !attachments.length) ||
+      running ||
+      !loaded ||
+      !contextReady ||
+      paused
+    )
+      return;
     setError('');
     setRunning(true);
     agent.addMessage({
       id: crypto.randomUUID(),
       role: 'user',
-      content: contextualMessage(text, pageContext),
+      content: messageContent(
+        contextualMessage(text, pageContext),
+        attachments,
+      ),
     });
     setDraft('');
+    setAttachments([]);
     setSource('');
     setSourceOpen(false);
     try {
@@ -380,7 +420,21 @@ export function Chat({
         voice={voice}
       />
       <form
-        className="chat-composer"
+        className={`chat-composer${dragging ? ' dragging' : ''}`}
+        onDragOver={(e) => {
+          if (e.dataTransfer.types.includes('Files')) {
+            e.preventDefault();
+            setDragging(true);
+          }
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          setDragging(false);
+          if (e.dataTransfer.files.length) {
+            e.preventDefault();
+            void addFiles([...e.dataTransfer.files]);
+          }
+        }}
         onSubmit={(e) => {
           e.preventDefault();
           void send(`${source ? `From ${source}:\n\n` : ''}${draft}`);
@@ -409,7 +463,44 @@ export function Chat({
             </button>
           </div>
         )}
+        {attachments.length > 0 && (
+          <div className="attachment-row">
+            {attachments.map((a) => (
+              <span className="attachment-chip" key={a.id}>
+                {a.kind === 'image' ? <img src={a.preview} alt="" /> : null}
+                <span>{a.name}</span>
+                <button
+                  type="button"
+                  aria-label={`Remove ${a.name}`}
+                  onClick={() =>
+                    setAttachments(attachments.filter((x) => x.id !== a.id))
+                  }
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         <div className="chat-compose-row">
+          <input
+            ref={fileInput}
+            type="file"
+            multiple
+            hidden
+            onChange={(e) => {
+              void addFiles([...(e.target.files ?? [])]);
+              e.target.value = '';
+            }}
+          />
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Attach files or images"
+            onClick={() => fileInput.current?.click()}
+          >
+            <Paperclip size={19} />
+          </button>
           <button
             type="button"
             className="icon-button"
@@ -425,6 +516,13 @@ export function Chat({
             value={draft}
             maxLength={4000}
             onChange={(e) => setDraft(e.target.value)}
+            onPaste={(e) => {
+              const files = [...e.clipboardData.files];
+              if (files.length) {
+                e.preventDefault();
+                void addFiles(files);
+              }
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -445,7 +543,12 @@ export function Chat({
             <button
               className="send-button"
               aria-label="Send message"
-              disabled={!draft.trim() || !loaded || !contextReady || paused}
+              disabled={
+                (!draft.trim() && !attachments.length) ||
+                !loaded ||
+                !contextReady ||
+                paused
+              }
             >
               <ArrowUp size={19} />
             </button>
