@@ -106,6 +106,7 @@ export interface SetupStatus {
   model: boolean;
   browser: boolean;
   voice: boolean;
+  voiceProvider?: 'openai' | 'local';
   slack: string;
   missing: string[];
 }

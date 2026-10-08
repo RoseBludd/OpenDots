@@ -29,6 +29,7 @@ import { ChatTranscript, isInternalVoiceReceipt } from './ChatTranscript';
 import type { CallReceipt, Conversation, Dot } from '../shared/types';
 import { Mascot } from './Mascot';
 import { useVoice } from './useVoice';
+import { useLocalVoice } from './useLocalVoice';
 import { CallView } from './CallView';
 export function Chat({
   thread,
@@ -36,6 +37,7 @@ export function Chat({
   initialPrompt,
   onConsumed,
   voiceReady,
+  voiceProvider,
   calls,
   paused,
   onSaved,
@@ -47,6 +49,7 @@ export function Chat({
   initialPrompt?: string;
   onConsumed: () => void;
   voiceReady: boolean;
+  voiceProvider?: 'openai' | 'local';
   calls: CallReceipt[];
   paused: boolean;
   onSaved: () => void;
@@ -92,7 +95,14 @@ export function Chat({
   const [error, setError] = useState('');
   const [loaded, setLoaded] = useState(false);
   const [running, setRunning] = useState(false);
-  const voice = useVoice(thread.id, onSaved, agent.messages.at(-1)?.id);
+  // Both hooks are always called; only the configured provider is ever started.
+  const realtimeVoice = useVoice(thread.id, onSaved, agent.messages.at(-1)?.id);
+  const localVoice = useLocalVoice(
+    thread.id,
+    onSaved,
+    agent.messages.at(-1)?.id,
+  );
+  const voice = voiceProvider === 'local' ? localVoice : realtimeVoice;
   const sent = useRef(false);
   const bottom = useRef<HTMLDivElement>(null);
   useEffect(() => {

@@ -1,4 +1,5 @@
 import type { Platform } from './platform.js';
+import { speakable } from '../shared/voice-text.js';
 export class VoiceService {
   private jobs = new Map<
     string,
@@ -7,6 +8,7 @@ export class VoiceService {
       calls: Map<string, Promise<string>>;
       deadline: ReturnType<typeof setTimeout>;
       providerId?: string;
+      turns: number;
     }
   >();
   constructor(
@@ -46,7 +48,12 @@ export class VoiceService {
       void this.expire(call.id, 'Call connection expired before activation.');
     }, 30_000);
     deadline.unref();
-    this.jobs.set(call.id, { controller, calls: new Map(), deadline });
+    this.jobs.set(call.id, {
+      controller,
+      calls: new Map(),
+      deadline,
+      turns: 0,
+    });
     const timeout = AbortSignal.timeout(20_000);
     const dot = this.platform.workspace.dot(
       this.platform.workspace.requireThread(threadId).dotId,
@@ -154,6 +161,92 @@ export class VoiceService {
       );
       throw error;
     }
+  }
+  // Local mode: speech is transcribed and synthesized by the local voice
+  // service (Whisper + Piper). The browser sends one utterance at a time and
+  // the Dot answers through the same compute path as a provider-backed call.
+  beginLocal(threadId: string) {
+    this.platform.requireReady();
+    this.platform.workspace.requireThread(threadId);
+    const setup = this.platform.setup();
+    if (!setup.voice || setup.voiceProvider !== 'local')
+      throw new Error(
+        'Local voice setup required: LOCAL_VOICE_URL and LOCAL_VOICE_SECRET.',
+      );
+    if (this.platform.store.settings().paused)
+      throw new Error('Dot is paused.');
+    if (this.jobs.size)
+      throw new Error('End the current call before starting another.');
+    const call = this.platform.workspace.createCall(threadId);
+    const deadline = setTimeout(() => {
+      void this.expire(call.id, 'Call connection expired before activation.');
+    }, 30_000);
+    deadline.unref();
+    this.jobs.set(call.id, {
+      controller: new AbortController(),
+      calls: new Map(),
+      deadline,
+      turns: 0,
+    });
+    return { id: call.id };
+  }
+  private localService() {
+    const { localVoiceUrl, localVoiceSecret } = this.platform.config;
+    if (!localVoiceUrl || !localVoiceSecret)
+      throw new Error('Local voice service is not configured.');
+    return { url: localVoiceUrl.replace(/\/$/, ''), secret: localVoiceSecret };
+  }
+  async localTurn(id: string, audioBase64: string) {
+    const call = this.requireCall(id);
+    const job = this.jobs.get(id);
+    if (!job) throw new Error('Call session expired; start a new call.');
+    if (job.turns >= 80)
+      throw new Error(
+        'This call reached its turn limit. Start another call to continue.',
+      );
+    const { url, secret } = this.localService();
+    const heard = await this.transport(`${url}/stt`, {
+      method: 'POST',
+      headers: { 'X-Voice-Secret': secret, 'Content-Type': 'audio/wav' },
+      body: Buffer.from(audioBase64, 'base64'),
+      signal: AbortSignal.any([
+        job.controller.signal,
+        AbortSignal.timeout(60_000),
+      ]),
+      redirect: 'error',
+    });
+    if (!heard.ok)
+      throw new Error(`Speech recognition failed (HTTP ${heard.status}).`);
+    const userText = String(
+      ((await heard.json()) as { text?: string }).text ?? '',
+    ).trim();
+    if (!userText) return { userText: '', replyText: '' };
+    job.turns++;
+    const reply = await this.platform.turn(
+      call.threadId,
+      `The user is speaking to you in a live voice call; their speech was transcribed locally, so it may contain small errors. Reply in one to three short spoken sentences with no markdown, lists or links, using your tools first if the request needs them.\nUser said: ${userText}`,
+      AbortSignal.any([job.controller.signal, AbortSignal.timeout(90_000)]),
+    );
+    return { userText, replyText: speakable(reply) };
+  }
+  async speak(id: string, text: string): Promise<ArrayBuffer> {
+    this.requireCall(id);
+    const job = this.jobs.get(id);
+    if (!job) throw new Error('Call session expired; start a new call.');
+    const { url, secret } = this.localService();
+    const spoken = await this.transport(`${url}/tts`, {
+      method: 'POST',
+      headers: { 'X-Voice-Secret': secret, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text.slice(0, 1500) }),
+      signal: AbortSignal.any([
+        job.controller.signal,
+        AbortSignal.timeout(60_000),
+      ]),
+      redirect: 'error',
+    });
+    if (!spoken.ok)
+      throw new Error(`Speech synthesis failed (HTTP ${spoken.status}).`);
+    return spoken.arrayBuffer();
   }
   activate(id: string) {
     const existingCall = this.requireCall(id);

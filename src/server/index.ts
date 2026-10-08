@@ -12,10 +12,7 @@ import { FamilyStore } from './family-store.js';
 import { familyRoutes } from './family-routes.js';
 import type { PlatformConfig } from './platform-config.js';
 import { AuthStore } from './auth-store.js';
-import {
-  applyFamilyPackage,
-  loadFamilyPackage,
-} from './family-bootstrap.js';
+import { applyFamilyPackage, loadFamilyPackage } from './family-bootstrap.js';
 import { storageAdapterFromEnv } from './storage-adapter.js';
 
 const host = process.env.HOST ?? '127.0.0.1';
@@ -82,6 +79,8 @@ const config: PlatformConfig = {
   voiceKey: process.env.VOICE_API_KEY,
   voiceModel: process.env.VOICE_MODEL,
   voiceName: process.env.VOICE_NAME ?? 'marin',
+  localVoiceUrl: process.env.LOCAL_VOICE_URL || undefined,
+  localVoiceSecret: process.env.LOCAL_VOICE_SECRET || undefined,
   slackChannel: process.env.SLACK_CHANNEL_NAME,
   slackTeam: process.env.SLACK_TEAM_ID,
   slackUsers: (process.env.SLACK_USER_IDS ?? '')

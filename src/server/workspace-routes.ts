@@ -155,6 +155,38 @@ export function workspaceRoutes(platform: Platform, voice: VoiceService) {
       201,
     );
   });
+  app.post('/voice/local/calls', async (c) => {
+    const data = z
+      .object({ threadId: z.string() })
+      .strict()
+      .safeParse(await c.req.json());
+    if (!data.success)
+      return c.json({ error: 'A conversation is required.' }, 400);
+    return c.json(voice.beginLocal(data.data.threadId), 201);
+  });
+  app.post('/voice/calls/:id/turn', async (c) => {
+    const data = z
+      .object({ audio: z.string().min(16).max(900_000) })
+      .strict()
+      .safeParse(await c.req.json());
+    if (!data.success)
+      return c.json({ error: 'A base64 WAV utterance is required.' }, 400);
+    return c.json(await voice.localTurn(c.req.param('id'), data.data.audio));
+  });
+  app.post('/voice/calls/:id/speak', async (c) => {
+    const data = z
+      .object({ text: z.string().trim().min(1).max(1500) })
+      .strict()
+      .safeParse(await c.req.json());
+    if (!data.success)
+      return c.json(
+        { error: 'Text of up to 1,500 characters is required.' },
+        400,
+      );
+    return new Response(await voice.speak(c.req.param('id'), data.data.text), {
+      headers: { 'Content-Type': 'audio/wav', 'Cache-Control': 'no-store' },
+    });
+  });
   app.get('/voice/calls/:id', (c) =>
     c.json(platform.workspace.call(c.req.param('id'))),
   );
@@ -203,7 +235,7 @@ export function workspaceRoutes(platform: Platform, voice: VoiceService) {
   app.onError((error, c) => {
     const text = error.message;
     const known =
-      /^(Setup|Voice setup|Dot |Space |Specialist |Conversation |Call |This call|End the current|Voice provider|An audio|Intelligence could not)/.test(
+      /^(Setup|Voice setup|Local voice|Speech |Dot |Space |Specialist |Conversation |Call |This call|End the current|Voice provider|An audio|Intelligence could not)/.test(
         text,
       );
     return c.json(

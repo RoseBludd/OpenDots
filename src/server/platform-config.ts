@@ -16,6 +16,9 @@ export interface PlatformConfig extends WebConfig {
   voiceKey?: string;
   voiceModel?: string;
   voiceName: string;
+  // Local speech service (Whisper + Piper); see services/local-voice.
+  localVoiceUrl?: string;
+  localVoiceSecret?: string;
   slackChannel?: string;
   slackTeam?: string;
   slackUsers: string[];
@@ -33,6 +36,11 @@ export function setupStatus(
     !config.apiKey && 'OPENAI_API_KEY',
     !config.model && 'OPENAI_MODEL',
   ].filter((item): item is string => !!item);
+  const localVoice = !!(
+    config.localVoiceUrl &&
+    config.localVoiceSecret &&
+    config.localVoiceSecret.length >= 24
+  );
   const declaredSlack = !!(
     config.slackChannel &&
     config.slackTeam &&
@@ -49,7 +57,11 @@ export function setupStatus(
     intelligence: !!config.intelligenceKey,
     model: !!(config.apiKey && config.model),
     browser: !!(config.browserUrl && config.browserSecret),
-    voice: !!(config.voiceKey && config.voiceModel && !missing.length),
+    voice: !!(
+      (localVoice || (config.voiceKey && config.voiceModel)) &&
+      !missing.length
+    ),
+    voiceProvider: localVoice ? 'local' : 'openai',
     slack,
     missing,
   };

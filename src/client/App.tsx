@@ -737,6 +737,7 @@ export function App() {
                   initialPrompt={pendingPrompt}
                   onConsumed={() => setPendingPrompt(undefined)}
                   voiceReady={workspace.setup.voice}
+                  voiceProvider={workspace.setup.voiceProvider}
                   calls={workspace.calls.filter(
                     (call) => call.threadId === thread.id,
                   )}
