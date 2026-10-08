@@ -1054,7 +1054,11 @@ export function App() {
     </div>
   );
   return configured ? (
-    <CopilotKitProvider runtimeUrl="/api/copilotkit" headers={authHeaders()}>
+    <CopilotKitProvider
+      runtimeUrl="/api/copilotkit"
+      headers={authHeaders()}
+      enableInspector={false}
+    >
       {content}
     </CopilotKitProvider>
   ) : (

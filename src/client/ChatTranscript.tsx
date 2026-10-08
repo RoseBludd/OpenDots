@@ -2,6 +2,7 @@ import { openPageLink } from './page-navigation';
 import { Fragment, type ReactNode } from 'react';
 import { PhoneOff } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { AssistantMessage, Message } from '@ag-ui/core';
 import type { CallReceipt } from '../shared/types';
 import { voiceReceiptMessagePrefix } from '../shared/voice-receipt';
@@ -56,6 +57,7 @@ export function ChatTranscript({
           {typeof message.content === 'string' && message.content.trim() && (
             <div className={`chat-bubble ${message.role}`}>
               <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
                 components={{
                   img: ({ alt }) => <span>{alt}</span>,
                   a: ({ href, children }) => (

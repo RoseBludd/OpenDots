@@ -2211,6 +2211,26 @@ h3 {
 .chat-bubble.assistant ol {
   padding-left: 18px;
 }
+.chat-bubble.assistant table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.chat-bubble.assistant th,
+.chat-bubble.assistant td {
+  border: 1px solid var(--line);
+  padding: 5px 9px;
+  text-align: left;
+}
+.chat-bubble.assistant th {
+  background: var(--lavender);
+  color: var(--ink);
+}
+.chat-bubble.assistant pre {
+  overflow-x: auto;
+}
 .chat-bubble a {
   text-decoration: underline;
   text-underline-offset: 3px;
