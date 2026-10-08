@@ -75,6 +75,7 @@ const config: PlatformConfig = {
   computerSupervisorUrl: process.env.COMPUTER_SUPERVISOR_URL,
   computerSupervisorToken: process.env.COMPUTER_SUPERVISOR_TOKEN,
   computerToken: process.env.COMPUTER_TOKEN,
+  computerProjectRoot: process.env.COMPUTER_PROJECT_ROOT || undefined,
   computerNamespace: process.env.COMPUTER_NAMESPACE,
   voiceKey: process.env.VOICE_API_KEY,
   voiceModel: process.env.VOICE_MODEL,

@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { Platform } from './platform.js';
 import { VoiceService } from './voice.js';
+import { resolveProjectPath } from './project-path.js';
 import {
   learningContainerIdSchema,
   validateLearningSettings,
@@ -16,12 +17,27 @@ const dotSchema = z
     learningContainerId: learningContainerIdSchema.optional(),
     skillDeliveryEnabled: z.boolean().optional(),
     avatar: z.enum(['blue', 'mint', 'orange', 'purple']).nullable().optional(),
+    projectPath: z.string().trim().max(300).nullable().optional(),
     spaceIds: z.array(z.string().min(1)).min(1).max(100).optional(),
     spaceId: z.string().min(1).optional(),
   })
   .strict();
 export function workspaceRoutes(platform: Platform, voice: VoiceService) {
   const app = new Hono();
+  /** Empty means "no project folder"; anything else must resolve inside the allowed root. */
+  const projectFolder = (value: string | null | undefined) => {
+    if (value === undefined) return { value: undefined };
+    if (!value) return { value: null };
+    try {
+      resolveProjectPath(value, platform.config.computerProjectRoot);
+      return { value };
+    } catch (error) {
+      return {
+        error:
+          error instanceof Error ? error.message : 'Invalid project folder.',
+      };
+    }
+  };
   app.route('/', pageRoutes(platform));
   app.get('/workspace', (c) =>
     c.json({
@@ -78,6 +94,8 @@ export function workspaceRoutes(platform: Platform, voice: VoiceService) {
         400,
       );
     }
+    const project = projectFolder(data.data.projectPath);
+    if (project.error) return c.json({ error: project.error }, 400);
     return c.json(
       platform.workspace.createDot(
         data.data.spaceId,
@@ -89,6 +107,7 @@ export function workspaceRoutes(platform: Platform, voice: VoiceService) {
         data.data.learningContainerId,
         data.data.skillDeliveryEnabled,
         data.data.avatar ?? null,
+        project.value ?? null,
       ),
       201,
     );
@@ -128,7 +147,17 @@ export function workspaceRoutes(platform: Platform, voice: VoiceService) {
         400,
       );
     }
-    return c.json(platform.workspace.updateDot(c.req.param('id'), data.data));
+    const project = projectFolder(data.data.projectPath);
+    if (project.error) return c.json({ error: project.error }, 400);
+    const updated = platform.workspace.updateDot(c.req.param('id'), {
+      ...data.data,
+      projectPath: project.value,
+    });
+    if (project.value !== undefined && project.value !== current.projectPath)
+      // Stop the old computer so a stale mount is never used; the next start
+      // recreates it with the new folder (its files and logins are kept).
+      await platform.computers.stop(current.id).catch(() => undefined);
+    return c.json(updated);
   });
   app.post('/conversations', async (c) => {
     const data = z
@@ -247,6 +276,7 @@ export function workspaceRoutes(platform: Platform, voice: VoiceService) {
   app.all('/copilotkit/*', (c) => platform.handle(c.req.raw));
   app.onError((error, c) => {
     const text = error.message;
+    console.error(`[api] ${c.req.method} ${c.req.path} failed:`, error);
     const known =
       /^(Setup|Voice setup|Local voice|Speech |Dot |Space |Specialist |Conversation |Call |This call|End the current|Voice provider|An audio|Intelligence could not)/.test(
         text,

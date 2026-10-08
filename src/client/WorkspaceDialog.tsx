@@ -69,6 +69,9 @@ export function WorkspaceDialog({
   const [avatar, setAvatar] = useState<string | null>(
     dialog.type === 'dot' ? (dialog.dot?.avatar ?? null) : null,
   );
+  const [projectPath, setProjectPath] = useState(
+    dialog.type === 'dot' ? (dialog.dot?.projectPath ?? '') : '',
+  );
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -221,6 +224,7 @@ export function WorkspaceDialog({
                 learningContainerId: learningContainer.trim() || null,
                 skillDeliveryEnabled: skillDelivery,
                 avatar,
+                projectPath: projectPath.trim() || null,
               };
             }
             if (dialog.type === 'settings') {
@@ -315,6 +319,39 @@ export function WorkspaceDialog({
                 }
               />
             </>
+          )}
+          {dialog.type === 'dot' && (
+            <fieldset className="space-access-fields">
+              <legend>Project folder</legend>
+              <label className="field-label" htmlFor="project-path">
+                Limit this Dot&apos;s computer to one folder
+              </label>
+              <input
+                id="project-path"
+                value={projectPath}
+                maxLength={300}
+                placeholder="C:\Users\you\my-project (blank = whole workspace)"
+                onChange={(event) => setProjectPath(event.target.value)}
+              />
+              <p className="muted">
+                Its computer sees only this folder, at <code>project/</code>.
+                Changing it stops the computer; start it again to apply.
+              </p>
+            </fieldset>
+          )}
+          {dialog.type === 'dot' && dialog.dot && (
+            <p className="muted dot-id-row">
+              Dot ID: <code>{dialog.dot.id}</code>{' '}
+              <button
+                type="button"
+                className="text-button"
+                onClick={() =>
+                  void navigator.clipboard?.writeText(dialog.dot!.id)
+                }
+              >
+                Copy
+              </button>
+            </p>
           )}
           {dialog.type === 'dot' && (
             <fieldset className="space-access-fields">

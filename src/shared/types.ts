@@ -83,6 +83,8 @@ export interface Dot {
   skillDeliveryEnabled?: boolean;
   /** Chosen mascot; null/undefined falls back to a stable per-Dot default. */
   avatar?: string | null;
+  /** Host folder this Dot's computer is limited to, mounted at /workspace/project. */
+  projectPath?: string | null;
 }
 export interface Conversation {
   id: string;

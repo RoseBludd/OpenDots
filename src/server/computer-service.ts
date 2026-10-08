@@ -8,6 +8,7 @@ import {
   type ComputerStatus,
 } from '../shared/computer-types.js';
 import type { WorkspaceStore } from './workspace.js';
+import { resolveProjectPath } from './project-path.js';
 import type { PlatformConfig } from './platform-config.js';
 const stateSchema = z.object({
   botId: z.string(),
@@ -245,7 +246,19 @@ export class ComputerService {
   async start(id: string) {
     await this.audited(id, 'start', 'owner', async () => {
       this.allowed(id, undefined, 'owner');
-      this.endpoint(id, await this.supervisor(`/computers/${id}/ensure`, {}));
+      const projectPath = this.workspace.dot(id)?.projectPath;
+      // A project Dot's computer sees only that folder; resolved again here so a
+      // moved or removed folder fails loudly instead of mounting nothing.
+      const project = projectPath
+        ? resolveProjectPath(projectPath, this.config.computerProjectRoot)
+        : undefined;
+      this.endpoint(
+        id,
+        await this.supervisor(
+          `/computers/${id}/ensure`,
+          project ? { project } : {},
+        ),
+      );
     });
     return this.status(id);
   }

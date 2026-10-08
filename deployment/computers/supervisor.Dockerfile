@@ -9,5 +9,7 @@ COPY deployment/computers/harden-supervisor.mjs /tmp/harden-supervisor.mjs
 RUN bun /tmp/harden-supervisor.mjs /app/src/environment.ts && rm /tmp/harden-supervisor.mjs
 COPY deployment/computers/add-extra-binds.mjs /tmp/add-extra-binds.mjs
 RUN bun /tmp/add-extra-binds.mjs /app/src/docker.ts
+COPY deployment/computers/add-project-binds.mjs /tmp/add-project-binds.mjs
+RUN bun /tmp/add-project-binds.mjs /app/src/docker.ts /app/src/index.ts
 EXPOSE 4300
 CMD ["bun", "src/index.ts"]

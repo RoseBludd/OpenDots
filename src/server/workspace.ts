@@ -27,6 +27,7 @@ export class WorkspaceStore {
       ['dots', 'learningContainerId', 'TEXT'],
       ['dots', 'skillDeliveryEnabled', 'INTEGER NOT NULL DEFAULT 0'],
       ['dots', 'avatar', 'TEXT'],
+      ['dots', 'projectPath', 'TEXT'],
       ['thread_bindings', 'learningContainerId', 'TEXT'],
     ]) {
       if (
@@ -138,6 +139,7 @@ export class WorkspaceStore {
     learningContainerId: string | null = null,
     skillDeliveryEnabled = false,
     avatar: string | null = null,
+    projectPath: string | null = null,
   ): Dot {
     this.validateSpaceAccess(spaceId, spaceIds);
     validateLearningSettings(learningContainerId, skillDeliveryEnabled);
@@ -152,13 +154,14 @@ export class WorkspaceStore {
       learningContainerId,
       skillDeliveryEnabled,
       avatar,
+      projectPath,
       createdAt: Date.now(),
     };
     this.db.exec('BEGIN');
     try {
       this.db
         .prepare(
-          'INSERT INTO dots (id, spaceId, name, instructions, researchAllowed, memoryAllowed, createdAt, learningContainerId, skillDeliveryEnabled, avatar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          'INSERT INTO dots (id, spaceId, name, instructions, researchAllowed, memoryAllowed, createdAt, learningContainerId, skillDeliveryEnabled, avatar, projectPath) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         )
         .run(
           dot.id,
@@ -171,6 +174,7 @@ export class WorkspaceStore {
           learningContainerId,
           +skillDeliveryEnabled,
           avatar,
+          projectPath,
         );
       for (const id of dot.spaceIds)
         this.db.prepare('INSERT INTO dot_spaces VALUES (?, ?)').run(dot.id, id);
@@ -204,6 +208,7 @@ export class WorkspaceStore {
       learningContainerId?: string | null;
       skillDeliveryEnabled?: boolean;
       avatar?: string | null;
+      projectPath?: string | null;
     },
   ): Dot {
     const current = this.dot(id);
@@ -222,7 +227,7 @@ export class WorkspaceStore {
     try {
       this.db
         .prepare(
-          'UPDATE dots SET name=?, instructions=?, researchAllowed=?, memoryAllowed=?, learningContainerId=?, skillDeliveryEnabled=?, avatar=? WHERE id=?',
+          'UPDATE dots SET name=?, instructions=?, researchAllowed=?, memoryAllowed=?, learningContainerId=?, skillDeliveryEnabled=?, avatar=?, projectPath=? WHERE id=?',
         )
         .run(
           patch.name,
@@ -232,6 +237,9 @@ export class WorkspaceStore {
           learningContainerId,
           +skillDeliveryEnabled,
           patch.avatar === undefined ? (current.avatar ?? null) : patch.avatar,
+          patch.projectPath === undefined
+            ? (current.projectPath ?? null)
+            : patch.projectPath,
           id,
         );
       this.db

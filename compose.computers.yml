@@ -29,6 +29,7 @@ services:
       COMPUTER_MEMORY_BYTES: ${COMPUTER_MEMORY_BYTES:-2147483648}
       COMPUTER_RUNTIME: ${COMPUTER_RUNTIME:-}
       COMPUTER_EXTRA_BINDS: ${COMPUTER_EXTRA_BINDS:-}
+      COMPUTER_PROJECT_ROOT: ${COMPUTER_PROJECT_ROOT:-}
     volumes:
       - ${ENGINE_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
     networks:

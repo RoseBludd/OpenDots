@@ -10,6 +10,7 @@ export interface PlatformConfig extends WebConfig {
   computerSupervisorUrl?: string;
   computerSupervisorToken?: string;
   computerToken?: string;
+  computerProjectRoot?: string;
   computerNamespace?: string;
   browserUrl?: string;
   browserSecret?: string;
