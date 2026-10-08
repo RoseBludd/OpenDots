@@ -39,7 +39,7 @@ const path = z
       !p.includes('\\') &&
       !p.includes('\0') &&
       !p.split('/').some((s) => s === '..'),
-    'Use a relative workspace path without traversal.',
+    'Use a path relative to the workspace root (for example genius/project/README.md), not a host path like C:\\... or an absolute path, and no "..".',
   );
 const empty = z.object({}).strict();
 const ref = {

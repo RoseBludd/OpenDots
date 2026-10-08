@@ -1,3 +1,4 @@
+import process from 'node:process';
 import { expect, it } from 'vitest';
 import { createHmac } from 'node:crypto';
 import { hardenSupervisorEnvironment } from '../deployment/computers/harden-supervisor.mjs';

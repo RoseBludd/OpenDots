@@ -11,6 +11,7 @@ export interface PlatformConfig extends WebConfig {
   computerSupervisorToken?: string;
   computerToken?: string;
   computerNamespace?: string;
+  computerMounts?: string;
   browserUrl?: string;
   browserSecret?: string;
   voiceKey?: string;
