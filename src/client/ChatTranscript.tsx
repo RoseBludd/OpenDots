@@ -83,6 +83,22 @@ export function ChatTranscript({
               </ReactMarkdown>
             </div>
           )}
+          {message.role === 'user' && Array.isArray(message.content) && (
+            <div className="chat-bubble user">
+              {message.content.map((part, i) =>
+                part.type === 'text' ? (
+                  <p key={i}>{part.text}</p>
+                ) : part.type === 'image' && part.source.type === 'data' ? (
+                  <img
+                    key={i}
+                    className="chat-attachment-image"
+                    alt="Attached"
+                    src={`data:${part.source.mimeType};base64,${part.source.value}`}
+                  />
+                ) : null,
+              )}
+            </div>
+          )}
           {message.role === 'assistant' && renderTools?.(message)}
           {calls
             .filter((call) => call.anchorMessageId === message.id)
