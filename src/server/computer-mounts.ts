@@ -19,6 +19,9 @@ export function mountsFor(raw: string | undefined, dotId: string) {
     }
     const [host, dest, mode] = parts;
     if (!host || !dest?.startsWith('/workspace/')) continue;
+    // Masks (/dev/null files, empty dirs) hide secrets inside a mounted folder;
+    // they are not folders to work in and would flood the prompt.
+    if (host === '/dev/null' || host.endsWith('/.opendots-empty')) continue;
     mounts.push({
       host,
       path: dest.slice('/workspace/'.length),

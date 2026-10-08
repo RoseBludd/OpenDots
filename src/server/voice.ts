@@ -225,28 +225,36 @@ export class VoiceService {
     const prompt = `The user is speaking to you in a live voice call; their speech was transcribed locally, so it may contain small errors. Reply in one to three short spoken sentences with no markdown, lists or links, using your tools first if the request needs them.\nUser said: ${userText}`;
     // Free routed models intermittently answer 503 "temporarily overloaded";
     // retry a few times before giving up so one bad draw does not kill a turn.
-    let reply = '';
+    const reply = await this.turnWithRetry(call.threadId, prompt, job);
+    return { userText, replyText: speakable(reply) };
+  }
+  private async turnWithRetry(
+    threadId: string,
+    prompt: string,
+    job: { controller: AbortController },
+  ): Promise<string> {
     for (let attempt = 1; ; attempt++) {
       try {
-        reply = await this.platform.turn(
-          call.threadId,
+        return await this.platform.turn(
+          threadId,
           prompt,
           AbortSignal.any([job.controller.signal, AbortSignal.timeout(90_000)]),
         );
-        break;
       } catch (error) {
         const text = error instanceof Error ? error.message : '';
-        const transient = /overloaded|temporarily|\b(429|502|503|504)\b|rate.?limit/i.test(text);
-        if (job.controller.signal.aborted) throw error;
-        if (!transient) throw error;
+        const transient =
+          /overloaded|temporarily|\b(429|502|503|504)\b|rate.?limit/i.test(
+            text,
+          );
+        if (job.controller.signal.aborted || !transient) throw error;
         if (attempt >= 3)
           throw new Error(
             'Dot could not reach its model right now (provider overloaded). Say that again in a moment.',
+            { cause: error },
           );
         await new Promise((resolve) => setTimeout(resolve, 800 * attempt));
       }
     }
-    return { userText, replyText: speakable(reply) };
   }
   async speak(id: string, text: string): Promise<ArrayBuffer> {
     this.requireCall(id);

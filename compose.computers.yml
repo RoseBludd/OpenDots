@@ -9,6 +9,17 @@ services:
       context: https://github.com/CopilotKit/OpenBot.git#b6932d31a8d6e7896c15139dfc27a6c6911deb27
       dockerfile: agent-computer/Dockerfile
     command: ['true']
+  # Developer layer (git, search, build chains, python, smarter file listing) over the
+  # pinned base. Build computer-image first, then this one.
+  computer-image-dev:
+    profiles: [build-computers]
+    image: opendots-computer:b6932d3-dev
+    build:
+      context: .
+      dockerfile: deployment/computers/computer.Dockerfile
+      args:
+        BASE: opendots-computer:b6932d3
+    command: ['true']
   computer-supervisor:
     image: opendots-supervisor:b6932d3-dot-auth
     build:
@@ -23,7 +34,7 @@ services:
       SUPERVISOR_TOKEN: ${COMPUTER_SUPERVISOR_TOKEN:?Set COMPUTER_SUPERVISOR_TOKEN in .env}
       COMPUTER_TOKEN: ${COMPUTER_TOKEN:?Set COMPUTER_TOKEN in .env}
       COMPUTER_NAMESPACE: ${COMPUTER_NAMESPACE:-opendots}
-      COMPUTER_IMAGE: opendots-computer:b6932d3
+      COMPUTER_IMAGE: opendots-computer:b6932d3-dev
       COMPUTER_BROWSER_MODE: headless
       COMPUTER_NETWORK: ''
       COMPUTER_MEMORY_BYTES: ${COMPUTER_MEMORY_BYTES:-2147483648}

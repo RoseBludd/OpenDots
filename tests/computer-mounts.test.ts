@@ -20,6 +20,13 @@ it('handles Windows drive-letter host paths', () => {
     { host: 'C:\\Users\\GENIUS', path: 'genius', mode: 'rw' },
   ]);
 });
+it('omits secret-masking binds from the mounts a Dot is told about', () => {
+  const masked =
+    '/mnt/c/Users/GENIUS:/workspace/genius|/home/u/.opendots-empty:/workspace/genius/.ssh:ro|/dev/null:/workspace/genius/.gitconfig:ro';
+  expect(mountsFor(masked, 'any')).toEqual([
+    { host: '/mnt/c/Users/GENIUS', path: 'genius', mode: 'rw' },
+  ]);
+});
 it('tells the Dot where mounted folders live, and nothing when none', () => {
   expect(mountsPrompt([])).toBe('');
   const text = mountsPrompt(mountsFor(raw, 'roofers'));

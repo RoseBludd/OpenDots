@@ -18,8 +18,8 @@ function replaceOnce(source, before, after, label) {
 export function addProjectBindsToDocker(source) {
   let next = replaceOnce(
     source,
-    '      ...extraBinds(),\n    ],',
-    '      ...(options.projectPath\n        ? [`${options.projectPath}:/workspace/project`]\n        : extraBinds()),\n    ],',
+    '      ...extraBinds(names.botId),\n    ],',
+    '      ...(options.projectPath\n        ? [`${options.projectPath}:/workspace/project`]\n        : extraBinds(names.botId)),\n    ],',
     'binds',
   );
   next = replaceOnce(
