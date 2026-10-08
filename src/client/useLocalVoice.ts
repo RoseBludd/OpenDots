@@ -11,9 +11,48 @@ const PREROLL_FRAMES = 10; // ~300 ms kept so the first syllable is not clipped
 const END_SILENCE_MS = 900;
 const MIN_VOICED_MS = 350;
 const MAX_UTTERANCE_MS = 20_000;
-const MIN_THRESHOLD = 0.012;
+const MIN_THRESHOLD = 0.006;
 const SPEAKING_THRESHOLD_FACTOR = 2.4; // harder to trigger while the Dot talks
 const TARGET_RATE = 16_000;
+const SILENT_MIC_MS = 6000; // warn if the chosen microphone stays this quiet
+const SILENT_LEVEL = 0.002;
+const DEVICE_KEY = 'opendots.micDeviceId';
+
+export interface LocalVoiceExtras {
+  level: number;
+  devices: { id: string; label: string }[];
+  deviceId: string;
+  micHint: string;
+  selectDevice: (id: string) => Promise<void>;
+}
+
+function savedDevice() {
+  try {
+    return localStorage.getItem(DEVICE_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+function saveDevice(id: string) {
+  try {
+    if (id) localStorage.setItem(DEVICE_KEY, id);
+    else localStorage.removeItem(DEVICE_KEY);
+  } catch {
+    // Remembering the choice is a convenience only.
+  }
+}
+
+function openMic(deviceId: string) {
+  return navigator.mediaDevices.getUserMedia({
+    audio: {
+      ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    },
+  });
+}
 
 const WORKLET = `class PCM extends AudioWorkletProcessor {
   process(inputs) { const ch = inputs[0] && inputs[0][0]; if (ch) this.port.postMessage(ch.slice(0)); return true; }
@@ -90,6 +129,11 @@ export function useLocalVoice(
   );
   const [caption, setCaption] = useState('');
   const [userCaption, setUserCaption] = useState('');
+  const [level, setLevel] = useState(0);
+  const [devices, setDevices] = useState<{ id: string; label: string }[]>([]);
+  const [deviceId, setDeviceId] = useState(savedDevice);
+  const [micHint, setMicHint] = useState('');
+  const mutedRef = useRef(false);
   const generation = useRef(0);
   const connecting = useRef(false);
   const ending = useRef(false);
@@ -99,8 +143,10 @@ export function useLocalVoice(
     | {
         id?: string;
         stream: MediaStream;
+        source: MediaStreamAudioSourceNode;
         context: AudioContext;
         node: AudioWorkletNode;
+        peak: number;
         transcript: string[];
         timer?: ReturnType<typeof setTimeout>;
         cancelled: boolean;
@@ -322,27 +368,84 @@ export function useLocalVoice(
     [speak],
   );
 
+  // Labels are only available once microphone permission has been granted.
+  const refreshDevices = async () => {
+    try {
+      const all = await navigator.mediaDevices.enumerateDevices();
+      setDevices(
+        all
+          .filter((device) => device.kind === 'audioinput')
+          .map((device, index) => ({
+            id: device.deviceId,
+            label: device.label || `Microphone ${index + 1}`,
+          })),
+      );
+    } catch {
+      setDevices([]);
+    }
+  };
+
+  // Switch microphones without ending the call.
+  const selectDevice = async (id: string) => {
+    saveDevice(id);
+    setDeviceId(id);
+    const current = session.current;
+    if (!current || current.cancelled) return;
+    try {
+      const next = await openMic(id);
+      if (session.current !== current || current.cancelled) {
+        next.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      next.getAudioTracks().forEach((track) => {
+        track.enabled = !mutedRef.current;
+      });
+      current.source.disconnect();
+      current.stream.getTracks().forEach((track) => track.stop());
+      current.source = current.context.createMediaStreamSource(next);
+      current.source.connect(current.node);
+      current.stream = next;
+      current.peak = 0;
+      setMicHint('');
+      void refreshDevices();
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? `Could not switch microphone: ${e.message}`
+          : 'Could not switch microphone.',
+      );
+    }
+  };
+
   const start = async () => {
     if (session.current || connecting.current || ending.current) return;
     connecting.current = true;
     const attempt = ++generation.current;
     setStatus('connecting');
     setError('');
+    mutedRef.current = false;
     setMuted(false);
     setSpeakerMuted(false);
     setStartedAt(undefined);
     setPhase('listening');
     setCaption('');
     setUserCaption('');
+    setLevel(0);
+    setMicHint('');
     let stream: MediaStream | undefined;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
+      try {
+        stream = await openMic(deviceId);
+      } catch (e) {
+        // A remembered microphone that was unplugged: fall back to the default.
+        if (!deviceId || !(e instanceof DOMException)) throw e;
+        if (e.name !== 'OverconstrainedError' && e.name !== 'NotFoundError')
+          throw e;
+        saveDevice('');
+        setDeviceId('');
+        stream = await openMic('');
+      }
+      void refreshDevices();
       if (attempt !== generation.current) {
         stream.getTracks().forEach((track) => track.stop());
         return;
@@ -355,12 +458,15 @@ export function useLocalVoice(
       await context.audioWorklet.addModule(moduleUrl);
       URL.revokeObjectURL(moduleUrl);
       const node = new AudioWorkletNode(context, 'pcm-capture');
-      context.createMediaStreamSource(stream).connect(node);
+      const source = context.createMediaStreamSource(stream);
+      source.connect(node);
       const current = {
         id: undefined as string | undefined,
         stream,
+        source,
         context,
         node,
+        peak: 0,
         transcript: [] as string[],
         timer: undefined as ReturnType<typeof setTimeout> | undefined,
         cancelled: false,
@@ -385,6 +491,8 @@ export function useLocalVoice(
       let utteranceMs = 0;
       let silenceMs = 0;
       let hot = 0;
+      let meterFrames = 0;
+      let meterPeak = 0;
       const finish = () => {
         const frames = utterance;
         const voiced = voicedMs;
@@ -406,6 +514,14 @@ export function useLocalVoice(
           const frame = pending.slice(0, frameSize);
           pending = pending.slice(frameSize);
           const level = rmsOf(frame);
+          current.peak = Math.max(current.peak, level);
+          meterPeak = Math.max(meterPeak, level);
+          if (level > 0.01) setMicHint((hint) => (hint ? '' : hint));
+          if (++meterFrames >= 3) {
+            setLevel(Math.min(1, Math.sqrt(meterPeak) * 2.2));
+            meterFrames = 0;
+            meterPeak = 0;
+          }
           const speaking = !!current.playing;
           const threshold =
             Math.max(MIN_THRESHOLD, noiseFloor * 3.5) *
@@ -453,6 +569,14 @@ export function useLocalVoice(
       setStatus('active');
       setStartedAt(Date.now());
       current.timer = setTimeout(() => void end(), 15 * 60_000);
+      // If the chosen microphone stays silent, say so instead of waiting forever.
+      setTimeout(() => {
+        if (session.current !== current || current.cancelled) return;
+        if (current.peak < SILENT_LEVEL && !mutedRef.current)
+          setMicHint(
+            `No sound from "${current.stream.getAudioTracks()[0]?.label || 'the microphone'}". Pick another microphone below, or check Windows sound input settings.`,
+          );
+      }, SILENT_MIC_MS);
     } catch (e) {
       if (attempt !== generation.current) {
         stream?.getTracks().forEach((track) => track.stop());
@@ -480,6 +604,7 @@ export function useLocalVoice(
     session.current?.stream.getAudioTracks().forEach((track) => {
       track.enabled = !next;
     });
+    mutedRef.current = next;
     setMuted(next);
   };
   const toggleSpeaker = () => {
@@ -504,5 +629,10 @@ export function useLocalVoice(
     userCaption,
     toggleMute,
     toggleSpeaker,
+    level,
+    devices,
+    deviceId,
+    micHint,
+    selectDevice,
   };
 }

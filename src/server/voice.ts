@@ -222,11 +222,30 @@ export class VoiceService {
     ).trim();
     if (!userText) return { userText: '', replyText: '' };
     job.turns++;
-    const reply = await this.platform.turn(
-      call.threadId,
-      `The user is speaking to you in a live voice call; their speech was transcribed locally, so it may contain small errors. Reply in one to three short spoken sentences with no markdown, lists or links, using your tools first if the request needs them.\nUser said: ${userText}`,
-      AbortSignal.any([job.controller.signal, AbortSignal.timeout(90_000)]),
-    );
+    const prompt = `The user is speaking to you in a live voice call; their speech was transcribed locally, so it may contain small errors. Reply in one to three short spoken sentences with no markdown, lists or links, using your tools first if the request needs them.\nUser said: ${userText}`;
+    // Free routed models intermittently answer 503 "temporarily overloaded";
+    // retry a few times before giving up so one bad draw does not kill a turn.
+    let reply = '';
+    for (let attempt = 1; ; attempt++) {
+      try {
+        reply = await this.platform.turn(
+          call.threadId,
+          prompt,
+          AbortSignal.any([job.controller.signal, AbortSignal.timeout(90_000)]),
+        );
+        break;
+      } catch (error) {
+        const text = error instanceof Error ? error.message : '';
+        const transient = /overloaded|temporarily|\b(429|502|503|504)\b|rate.?limit/i.test(text);
+        if (job.controller.signal.aborted) throw error;
+        if (!transient) throw error;
+        if (attempt >= 3)
+          throw new Error(
+            'Dot could not reach its model right now (provider overloaded). Say that again in a moment.',
+          );
+        await new Promise((resolve) => setTimeout(resolve, 800 * attempt));
+      }
+    }
     return { userText, replyText: speakable(reply) };
   }
   async speak(id: string, text: string): Promise<ArrayBuffer> {

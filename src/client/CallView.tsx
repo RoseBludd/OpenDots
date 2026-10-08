@@ -11,13 +11,14 @@ import {
 import { Mascot } from './Mascot';
 import type { Dot } from '../shared/types';
 import type { useVoice } from './useVoice';
+import type { LocalVoiceExtras } from './useLocalVoice';
 
 export function CallView({
   dot,
   voice,
 }: {
   dot: Dot;
-  voice: ReturnType<typeof useVoice>;
+  voice: ReturnType<typeof useVoice> & Partial<LocalVoiceExtras>;
 }) {
   const [minimized, setMinimized] = useState(false);
   const [now, setNow] = useState(Date.now());
@@ -86,6 +87,35 @@ export function CallView({
         <p className="call-warning" role="alert">
           {voice.error}
         </p>
+      )}
+      {voice.micHint && (
+        <p className="call-warning" role="alert">
+          {voice.micHint}
+        </p>
+      )}
+      {voice.devices && voice.selectDevice && voice.status === 'active' && (
+        <div className="call-mic">
+          <Mic size={15} aria-hidden="true" />
+          <select
+            aria-label="Microphone"
+            value={voice.deviceId ?? ''}
+            onChange={(event) => void voice.selectDevice?.(event.target.value)}
+          >
+            <option value="">System default</option>
+            {voice.devices.map((device) => (
+              <option key={device.id} value={device.id}>
+                {device.label}
+              </option>
+            ))}
+          </select>
+          <span
+            className="call-level"
+            role="meter"
+            aria-label="Microphone level"
+          >
+            <i style={{ width: `${Math.round((voice.level ?? 0) * 100)}%` }} />
+          </span>
+        </div>
       )}
       <div className="call-controls">
         <button

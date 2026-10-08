@@ -4096,6 +4096,44 @@ h3 {
   text-align: center;
   color: #ffddcb;
 }
+.call-mic {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 440px;
+  width: 100%;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+}
+.call-mic select {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: inherit;
+  font: inherit;
+}
+.call-mic select option {
+  color: #222;
+}
+.call-level {
+  flex: 0 0 64px;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.2);
+}
+.call-level i {
+  display: block;
+  height: 100%;
+  background: #9fe3b3;
+  transition: width 80ms linear;
+}
+.call-view.minimized .call-mic {
+  display: none;
+}
 .call-view.minimized {
   inset: auto 24px 110px auto;
   width: 300px;
