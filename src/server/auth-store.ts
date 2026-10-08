@@ -1,5 +1,10 @@
 import { DatabaseSync } from 'node:sqlite';
-import { randomBytes, scryptSync, timingSafeEqual, createHash } from 'node:crypto';
+import {
+  randomBytes,
+  scryptSync,
+  timingSafeEqual,
+  createHash,
+} from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { getCookie } from 'hono/cookie';
@@ -104,9 +109,9 @@ export class AuthStore {
   }
 
   private migrateUserAvatars() {
-    const cols = this.db
-      .prepare(`PRAGMA table_info(users)`)
-      .all() as { name: string }[];
+    const cols = this.db.prepare(`PRAGMA table_info(users)`).all() as {
+      name: string;
+    }[];
     if (cols.some((c) => c.name === 'avatarPath')) return;
     this.db.exec(`CREATE TABLE users_new (
         id TEXT PRIMARY KEY,
@@ -186,7 +191,14 @@ export class AuthStore {
       .prepare(
         'INSERT INTO users (id, name, email, passwordHash, role, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
       )
-      .run(id, name.trim(), email.trim().toLowerCase(), hashPassword(password), role, now);
+      .run(
+        id,
+        name.trim(),
+        email.trim().toLowerCase(),
+        hashPassword(password),
+        role,
+        now,
+      );
     return {
       id,
       name: name.trim(),
@@ -200,9 +212,7 @@ export class AuthStore {
   setAvatarPath(userId: string, avatarPath: string | null) {
     const now = Date.now();
     this.db
-      .prepare(
-        'UPDATE users SET avatarPath=?, avatarUpdatedAt=? WHERE id=?',
-      )
+      .prepare('UPDATE users SET avatarPath=?, avatarUpdatedAt=? WHERE id=?')
       .run(avatarPath, avatarPath ? now : null, userId);
   }
   verifyLogin(email: string, password: string): User | undefined {
@@ -256,7 +266,9 @@ export class AuthStore {
       .run(now, id);
     return result.changes > 0;
   }
-  redeemJoinCode(code: string): { role: 'adult' | 'kid'; codeId: string } | undefined {
+  redeemJoinCode(
+    code: string,
+  ): { role: 'adult' | 'kid'; codeId: string } | undefined {
     const hash = hashJoinCode(code);
     const now = Date.now();
     const row = this.db

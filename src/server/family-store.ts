@@ -72,10 +72,12 @@ type PersonMapper = (row: {
 }) => Person;
 
 function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'member';
+  return (
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'member'
+  );
 }
 
 export class FamilyStore {
@@ -159,8 +161,24 @@ export class FamilyStore {
       .prepare(
         'INSERT INTO people (id, name, slug, userId, guardianId, isMinor, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
       )
-      .run(id, name.trim(), slug, userId ?? null, guardianId, isMinor ? 1 : 0, now);
-    return { id, name: name.trim(), slug, userId: userId ?? null, guardianId, isMinor, createdAt: now };
+      .run(
+        id,
+        name.trim(),
+        slug,
+        userId ?? null,
+        guardianId,
+        isMinor ? 1 : 0,
+        now,
+      );
+    return {
+      id,
+      name: name.trim(),
+      slug,
+      userId: userId ?? null,
+      guardianId,
+      isMinor,
+      createdAt: now,
+    };
   }
   private personFromRow(row: {
     id: string;
@@ -199,7 +217,9 @@ export class FamilyStore {
   }
   deletePerson(id: string): boolean {
     this.db.prepare('DELETE FROM memory_people WHERE personId=?').run(id);
-    this.db.prepare('DELETE FROM memory_subscriptions WHERE personId=?').run(id);
+    this.db
+      .prepare('DELETE FROM memory_subscriptions WHERE personId=?')
+      .run(id);
     const r = this.db.prepare('DELETE FROM people WHERE id=?').run(id);
     return r.changes > 0;
   }
@@ -234,7 +254,9 @@ export class FamilyStore {
     for (const pid of input.peopleIds ?? []) {
       if (this.personById(pid))
         this.db
-          .prepare('INSERT OR IGNORE INTO memory_people (memoryId, personId) VALUES (?, ?)')
+          .prepare(
+            'INSERT OR IGNORE INTO memory_people (memoryId, personId) VALUES (?, ?)',
+          )
           .run(id, pid);
     }
     const memory = this.getMemory(id)!;
@@ -303,7 +325,9 @@ export class FamilyStore {
       .filter((m) => this.canSee(m, user));
   }
   listMemoriesForUser(userId: string, user?: FamilyUser): Memory[] {
-    return this.listMemories(user).filter((m) => m.ownerUserId === userId || this.canSee(m, user));
+    return this.listMemories(user).filter(
+      (m) => m.ownerUserId === userId || this.canSee(m, user),
+    );
   }
   memoriesInvolvingPerson(personId: string, user?: FamilyUser): Memory[] {
     const rows = this.db
@@ -334,14 +358,24 @@ export class FamilyStore {
     if (!m || m.ownerUserId !== userId) return false;
     this.db.prepare('DELETE FROM memory_people WHERE memoryId=?').run(id);
     this.db.prepare('DELETE FROM memory_shares WHERE memoryId=?').run(id);
-    this.db.prepare('DELETE FROM memory_notifications WHERE memoryId=?').run(id);
-    return this.db.prepare('DELETE FROM memories WHERE id=?').run(id).changes > 0;
+    this.db
+      .prepare('DELETE FROM memory_notifications WHERE memoryId=?')
+      .run(id);
+    return (
+      this.db.prepare('DELETE FROM memories WHERE id=?').run(id).changes > 0
+    );
   }
 
   // ---- shares / subscriptions / notifications ----
-  grantShare(memoryId: string, grantedBy: string, personId?: string | null, scope: Share['scope'] = 'person'): Share | undefined {
+  grantShare(
+    memoryId: string,
+    grantedBy: string,
+    personId?: string | null,
+    scope: Share['scope'] = 'person',
+  ): Share | undefined {
     if (!this.getMemory(memoryId)) return undefined;
-    if (scope === 'person' && personId && !this.personById(personId)) return undefined;
+    if (scope === 'person' && personId && !this.personById(personId))
+      return undefined;
     const share: Share = {
       id: randomUUID(),
       memoryId,
@@ -354,7 +388,14 @@ export class FamilyStore {
       .prepare(
         'INSERT INTO memory_shares (id, memoryId, personId, scope, grantedBy, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
       )
-      .run(share.id, share.memoryId, share.personId, share.scope, share.grantedBy, share.createdAt);
+      .run(
+        share.id,
+        share.memoryId,
+        share.personId,
+        share.scope,
+        share.grantedBy,
+        share.createdAt,
+      );
     return share;
   }
   revokeShare(id: string, grantedBy: string): boolean {
@@ -366,7 +407,9 @@ export class FamilyStore {
   }
   listShares(memoryId: string): Share[] {
     return this.db
-      .prepare('SELECT id, memoryId, personId, scope, grantedBy, createdAt FROM memory_shares WHERE memoryId=?')
+      .prepare(
+        'SELECT id, memoryId, personId, scope, grantedBy, createdAt FROM memory_shares WHERE memoryId=?',
+      )
       .all(memoryId) as unknown as Share[];
   }
   subscribe(userId: string, personId: string | null): void {
@@ -379,25 +422,35 @@ export class FamilyStore {
   unsubscribe(userId: string, personId: string | null): boolean {
     return (
       this.db
-        .prepare('DELETE FROM memory_subscriptions WHERE subscriberUserId=? AND personId IS ?')
+        .prepare(
+          'DELETE FROM memory_subscriptions WHERE subscriberUserId=? AND personId IS ?',
+        )
         .run(userId, personId).changes > 0
     );
   }
   listSubscriptions(userId: string): { id: string; personId: string | null }[] {
     return this.db
-      .prepare('SELECT id, personId FROM memory_subscriptions WHERE subscriberUserId=?')
+      .prepare(
+        'SELECT id, personId FROM memory_subscriptions WHERE subscriberUserId=?',
+      )
       .all(userId) as { id: string; personId: string | null }[];
   }
   /** Fan-out: notify subscribers of attached people + family-wide for family/public visibility. */
   fanOut(memory: Memory, notifyUserIds?: string[]): number {
     const targets = new Set<string>(notifyUserIds ?? []);
     if (memory.visibility === 'family' || memory.visibility === 'public') {
-      for (const row of this.db.prepare('SELECT DISTINCT subscriberUserId AS u FROM memory_subscriptions').all() as { u: string }[])
+      for (const row of this.db
+        .prepare(
+          'SELECT DISTINCT subscriberUserId AS u FROM memory_subscriptions',
+        )
+        .all() as { u: string }[])
         targets.add(row.u);
     }
     for (const person of memory.people) {
       const subs = this.db
-        .prepare('SELECT subscriberUserId FROM memory_subscriptions WHERE personId=?')
+        .prepare(
+          'SELECT subscriberUserId FROM memory_subscriptions WHERE personId=?',
+        )
         .all(person.id) as { subscriberUserId: string }[];
       for (const s of subs) targets.add(s.subscriberUserId);
     }
@@ -424,13 +477,19 @@ export class FamilyStore {
   }
   unreadCount(userId: string): number {
     const row = this.db
-      .prepare('SELECT COUNT(*) AS n FROM memory_notifications WHERE userId=? AND readAt IS NULL')
+      .prepare(
+        'SELECT COUNT(*) AS n FROM memory_notifications WHERE userId=? AND readAt IS NULL',
+      )
       .get(userId) as { n: number };
     return Number(row.n);
   }
   markNotificationsRead(userId: string): number {
-    return Number(this.db
-      .prepare('UPDATE memory_notifications SET readAt=? WHERE userId=? AND readAt IS NULL')
-      .run(Date.now(), userId).changes);
+    return Number(
+      this.db
+        .prepare(
+          'UPDATE memory_notifications SET readAt=? WHERE userId=? AND readAt IS NULL',
+        )
+        .run(Date.now(), userId).changes,
+    );
   }
 }

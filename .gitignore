@@ -22,3 +22,6 @@ data/
 
 # Python bytecode from services/local-voice
 __pycache__/
+
+# Machine-specific npm settings (e.g. Windows script-shell); keep in ~/.npmrc instead
+.npmrc

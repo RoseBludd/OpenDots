@@ -77,6 +77,8 @@ const config: PlatformConfig = {
   computerToken: process.env.COMPUTER_TOKEN,
   computerProjectRoot: process.env.COMPUTER_PROJECT_ROOT || undefined,
   computerNamespace: process.env.COMPUTER_NAMESPACE,
+  computerMounts: process.env.COMPUTER_EXTRA_BINDS,
+  maxOutputTokens: Number(process.env.OPENAI_MAX_OUTPUT_TOKENS) || undefined,
   voiceKey: process.env.VOICE_API_KEY,
   voiceModel: process.env.VOICE_MODEL,
   voiceName: process.env.VOICE_NAME ?? 'marin',

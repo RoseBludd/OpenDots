@@ -21,7 +21,8 @@ export function loadFamilyPackage(path: string): FamilyPackage {
     const m = line.match(/^(\w+):\s*(.*)$/);
     if (!m) continue;
     const [, key, value] = m;
-    if (key === 'spaceName') pkg.space = { name: value, description: pkg.space?.description ?? '' };
+    if (key === 'spaceName')
+      pkg.space = { name: value, description: pkg.space?.description ?? '' };
     if (key === 'spaceDescription') {
       pkg.space = {
         name: pkg.space?.name ?? 'Family Home',
