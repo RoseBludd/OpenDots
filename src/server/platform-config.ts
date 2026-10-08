@@ -14,6 +14,8 @@ export interface PlatformConfig extends WebConfig {
   computerNamespace?: string;
   computerMounts?: string;
   maxOutputTokens?: number;
+  /** Sampling temperature for Dot turns; low keeps small routed models coherent. */
+  temperature?: number;
   browserUrl?: string;
   browserSecret?: string;
   voiceKey?: string;

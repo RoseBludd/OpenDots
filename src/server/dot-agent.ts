@@ -20,6 +20,7 @@ import { Store } from './store.js';
 import { WorkspaceStore } from './workspace.js';
 import { mountsFor, mountsPrompt } from './computer-mounts.js';
 import { developmentGuidance } from './computer-guidance.js';
+import { resilientFetch } from './resilient-fetch.js';
 import type { PlatformConfig } from './platform-config.js';
 import { browserResponse } from './research.js';
 const channelError = () => ({
@@ -275,6 +276,7 @@ export class DotAgent extends AbstractAgent {
           baseURL: this.config.baseUrl ?? 'https://api.openai.com/v1',
           api: 'chat-completions',
           maxRetries: 1,
+          fetch: resilientFetch(),
         });
         const serverTools = [
           ...tools,
@@ -320,6 +322,7 @@ export class DotAgent extends AbstractAgent {
               modelOptions: {
                 max_completion_tokens:
                   this.config.maxOutputTokens ?? (computerWork ? 4000 : 2200),
+                temperature: this.config.temperature,
               },
               agentLoopStrategy: maxIterations(
                 computerWork

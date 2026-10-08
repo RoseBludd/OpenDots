@@ -50,6 +50,28 @@ COMPUTER_EXTRA_BINDS=roofers=/c/Users/GENIUS/Rooferzs:/workspace/genius/project|
 
 An entry with a `dotId=` prefix mounts only into that Dot's computer; an entry without one mounts into every Dot, which breaks the per-Dot file isolation described below for that folder. Prefer `:ro` unless the Dot must write. Binds apply when a computer container is created, so after changing them rebuild/restart the supervisor and remove that Dot's container (volumes are retained) before starting it again.
 
+## Limit a Dot to one project
+
+Open a Dot's settings and set **Project folder** (for example `C:\Users\you\my-project`). Its computer then
+mounts only that folder, at `project/`, instead of the global `COMPUTER_EXTRA_BINDS`. The folder must be inside
+`COMPUTER_PROJECT_ROOT`, and hidden folders are refused. Changing it stops the computer; start it again to apply
+(its files and logins are kept). Dots without a project folder keep the shared mounts, so they can work across
+folders. The supervisor enforces this, not just the prompt.
+
+## Developer image
+
+`compose.computers.yml` builds `opendots-computer:<rev>-dev` over the pinned base (`docker compose -f
+compose.computers.yml --profile build-computers build computer-image computer-image-dev`). It adds git, ripgrep,
+python3, pnpm, TypeScript and build tools, and patches the file listing to be breadth-first and skip `.git`,
+`node_modules` and build folders. Each command still stops after 60 seconds, so long builds run in the
+background and are polled.
+
+## Model gateways
+
+Dots need a route that supports native tool calls. Gateways that route across free providers can return an
+overload as HTTP 200 with an error body; Dot turns retry these. Agent-style routes (ones that run their own
+tools) cannot drive Dot's computer tools. Test a route with a tool-calling request before using it here.
+
 ## Use the computer
 
 - **Browser:** navigate and inspect the current page, including screenshots and element snapshots. Browser profiles keep cookies and logins across container restarts.
