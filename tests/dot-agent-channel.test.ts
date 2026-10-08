@@ -216,3 +216,22 @@ it('exposes only the canonical review tool to web chat and none to Slack', async
     expect.objectContaining({ tools: [] }),
   );
 });
+it('ends a run that exceeds its time budget with a clear error instead of silently', async () => {
+  vi.useFakeTimers();
+  try {
+    const f = fixture(false);
+    inner.run.mockReturnValue(new Observable<BaseEvent>(() => {}));
+    const pending = lastValueFrom(f.agent.run(f.input).pipe(toArray()));
+    await vi.advanceTimersByTimeAsync(91_000);
+    const events = await pending;
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: EventType.RUN_ERROR,
+        message: expect.stringContaining('longer than 90 seconds'),
+      }),
+    ]);
+    expect(inner.abortRun).toHaveBeenCalled();
+  } finally {
+    vi.useRealTimers();
+  }
+});
