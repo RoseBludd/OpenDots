@@ -11,7 +11,8 @@ const dockerBefore =
   'async function inspectOwned(names): Promise<{\n  status: string;\n  token?: string;\n} | null> {\n  return {\n      token: tokenIn(info.Config?.Env),\n  };\n}\n' +
   'type EnsureOptions = {\n  spireSocketVolume?: string;\n};\n' +
   'if (\n  existing &&\n  (!(await runsCurrentImage(existing.image, options.image)) ||\n        !holdsCurrentToken(existing.token, options.environment))\n) {}\n' +
-  'createContainer({\n          Labels: labelsFor(names),\n          Env: options.environment,\n});\n';
+  'createContainer({\n          Labels: labelsFor(names),\n          Env: options.environment,\n});\n' +
+  'const hostConfig = {\n    CapDrop: ["ALL"],\n    PidsLimit: 512,\n};\n';
 const indexBefore =
   'app.post("/computers/:botId/ensure", async (context) => {\n    const identity = await registerEntry(parsed.names);\n    const state = await ensure(parsed.names, {\n      ...(spireSocketVolume ? { spireSocketVolume } : {}),\n    });\n});\n';
 
@@ -21,6 +22,8 @@ it('patches the supervisor to scope one computer to one project, failing closed 
   expect(docker).toContain(':/workspace/project');
   expect(docker).toContain('extraBinds(names.botId)');
   expect(docker).toContain('"opendots.project"');
+  expect(docker).toContain('CapAdd: ["FOWNER"]');
+  expect(docker).toContain('!existing.fowner');
   expect(docker).toContain(
     '(existing.project ?? "") !== (options.projectPath ?? "")',
   );

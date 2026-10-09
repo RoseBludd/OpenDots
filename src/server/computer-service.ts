@@ -9,6 +9,10 @@ import {
 } from '../shared/computer-types.js';
 import type { WorkspaceStore } from './workspace.js';
 import { resolveProjectPath } from './project-path.js';
+import { mountsFor } from './computer-mounts.js';
+import { pushFromHost, type GitRunner } from './host-git.js';
+import { realpathSync } from 'node:fs';
+import { join } from 'node:path';
 import type { PlatformConfig } from './platform-config.js';
 const stateSchema = z.object({
   botId: z.string(),
@@ -31,7 +35,66 @@ export class ComputerService {
     private paused: () => boolean,
     private transport: typeof fetch = fetch,
     private deadlineMs = 70000,
+    private runGit?: GitRunner,
   ) {}
+  get gitPushEnabled() {
+    return !!this.config.computerGitPush;
+  }
+  /** Maps a workspace-relative path to the writable host folder mounted there. */
+  private hostFolder(id: string, workspacePath: string) {
+    const dot = this.workspace.dot(id)!;
+    const mounts = dot.projectPath
+      ? [
+          {
+            host: resolveProjectPath(
+              dot.projectPath,
+              this.config.computerProjectRoot,
+            ),
+            path: 'project',
+            mode: 'rw' as const,
+            scoped: true,
+          },
+        ]
+      : mountsFor(this.config.computerMounts, id);
+    const wanted = workspacePath.replace(/\/+$/, '');
+    const mount = mounts
+      .filter((m) => wanted === m.path || wanted.startsWith(`${m.path}/`))
+      .sort((a, b) => b.path.length - a.path.length)[0];
+    if (!mount)
+      throw new Error(
+        'Pushing only works for repositories inside a mounted host folder, for example project/ or genius/<repo>.',
+      );
+    if (mount.mode === 'ro')
+      throw new Error('That folder is mounted read-only.');
+    if (!mount.host.startsWith('/'))
+      throw new Error('The mounted folder is not reachable from the server.');
+    const root = realpathSync(mount.host);
+    const dir = realpathSync(join(root, wanted.slice(mount.path.length)));
+    if (dir !== root && !dir.startsWith(`${root}/`))
+      throw new Error('That folder is outside the mounted folder.');
+    return { dir, root, allowRoot: mount.scoped };
+  }
+  private async gitPush(
+    id: string,
+    input: { path: string; remote: string; branch?: string },
+    signal?: AbortSignal,
+  ) {
+    if (!this.gitPushEnabled)
+      throw new Error(
+        'Pushing to Git is not enabled on this server (set COMPUTER_GIT_PUSH=1).',
+      );
+    const { dir, root, allowRoot } = this.hostFolder(id, input.path);
+    return pushFromHost({
+      dir,
+      root,
+      allowRoot,
+      remote: input.remote,
+      branch: input.branch,
+      gitCommand: this.config.computerHostGit,
+      run: this.runGit,
+      signal,
+    });
+  }
   get configured() {
     return !!(
       this.config.computerSupervisorUrl?.trim() &&
@@ -332,6 +395,15 @@ export class ComputerService {
     if (!Object.hasOwn(computerInputs, action))
       throw new Error('Unknown computer action.');
     const parsed = computerInputs[action].parse(input);
+    if (action === 'git_push')
+      return this.audited(id, action, actor, async () => {
+        this.allowed(id, 'shell', actor);
+        return this.gitPush(
+          id,
+          parsed as { path: string; remote: string; branch?: string },
+          signal,
+        );
+      });
     return this.audited(id, action, actor, async () => {
       if (actor === 'agent' && action.startsWith('human_'))
         throw new Error('Human controls are owner-only.');

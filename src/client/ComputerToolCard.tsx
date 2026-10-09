@@ -30,6 +30,7 @@ const labels: Record<string, string> = {
   files_read: 'Reading file',
   files_list: 'Listing files',
   exec: 'Running terminal command',
+  git_push: 'Pushing to Git',
 };
 export function computerToolResult(raw: unknown): Record<string, unknown> {
   if (typeof raw === 'string') {

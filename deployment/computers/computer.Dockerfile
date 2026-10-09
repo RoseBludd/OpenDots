@@ -15,6 +15,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # executable; without these git refuses the repo or shows the whole tree modified.
     && git config --system --add safe.directory '*' \
     && git config --system core.filemode false \
-    && git config --system core.autocrlf false
+    && git config --system core.autocrlf false \
+    && git config --system init.defaultBranch main \
+    && git config --system user.name "OpenDots Dot" \
+    && git config --system user.email "dot@opendots.local"
 COPY deployment/computers/patch-computer-workspace.mjs /tmp/patch-computer-workspace.mjs
 RUN bun /tmp/patch-computer-workspace.mjs /app/src/workspace.ts && rm /tmp/patch-computer-workspace.mjs

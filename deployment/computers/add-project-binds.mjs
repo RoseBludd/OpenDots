@@ -25,14 +25,23 @@ export function addProjectBindsToDocker(source) {
   next = replaceOnce(
     next,
     '  token?: string;\n} | null> {',
-    '  token?: string;\n  project?: string;\n} | null> {',
+    '  token?: string;\n  project?: string;\n  fowner?: boolean;\n} | null> {',
     'inspect type',
   );
   next = replaceOnce(
     next,
     '      token: tokenIn(info.Config?.Env),',
-    '      token: tokenIn(info.Config?.Env),\n      project: info.Config?.Labels?.["opendots.project"],',
+    '      token: tokenIn(info.Config?.Env),\n      project: info.Config?.Labels?.["opendots.project"],\n      fowner: !!info.HostConfig?.CapAdd?.includes("FOWNER"),',
     'inspect value',
+  );
+  // Every capability is dropped, so even root cannot chmod files on a bind-mounted
+  // host folder (they belong to the host user) and git fails on init, config and
+  // push -u. FOWNER restores chmod/utimes on files the container can already reach.
+  next = replaceOnce(
+    next,
+    '    CapDrop: ["ALL"],\n',
+    '    CapDrop: ["ALL"],\n    CapAdd: ["FOWNER"],\n',
+    'capabilities',
   );
   next = replaceOnce(
     next,
@@ -43,7 +52,7 @@ export function addProjectBindsToDocker(source) {
   next = replaceOnce(
     next,
     '!holdsCurrentToken(existing.token, options.environment))',
-    '!holdsCurrentToken(existing.token, options.environment) ||\n        (existing.project ?? "") !== (options.projectPath ?? ""))',
+    '!holdsCurrentToken(existing.token, options.environment) ||\n        !existing.fowner ||\n        (existing.project ?? "") !== (options.projectPath ?? ""))',
     'recreate',
   );
   next = replaceOnce(

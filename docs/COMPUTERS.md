@@ -58,6 +58,15 @@ mounts only that folder, at `project/`, instead of the global `COMPUTER_EXTRA_BI
 (its files and logins are kept). Dots without a project folder keep the shared mounts, so they can work across
 folders. The supervisor enforces this, not just the prompt.
 
+## Git from a Dot
+
+Commits happen inside the computer (git is installed; bind-mounted folders work because computers keep the
+`FOWNER` capability). Computers hold no Git credentials, so publishing goes through `computer_git_push`: the
+server runs git on the host with the owner's own sign-in. It is off by default; set `COMPUTER_GIT_PUSH=1`
+(and `COMPUTER_HOST_GIT` to Windows `git.exe` under WSL). It needs the Dot's computer and shell permissions,
+pushes one branch with a fixed refspec (never forced), only for a repository inside a folder mounted for that
+Dot, and refuses a repository sitting at the root of a shared mount such as a home folder.
+
 ## Developer image
 
 `compose.computers.yml` builds `opendots-computer:<rev>-dev` over the pinned base (`docker compose -f

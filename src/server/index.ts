@@ -76,6 +76,8 @@ const config: PlatformConfig = {
   computerSupervisorToken: process.env.COMPUTER_SUPERVISOR_TOKEN,
   computerToken: process.env.COMPUTER_TOKEN,
   computerProjectRoot: process.env.COMPUTER_PROJECT_ROOT || undefined,
+  computerGitPush: /^(1|true|yes)$/i.test(process.env.COMPUTER_GIT_PUSH ?? ''),
+  computerHostGit: process.env.COMPUTER_HOST_GIT || undefined,
   computerNamespace: process.env.COMPUTER_NAMESPACE,
   computerMounts: process.env.COMPUTER_EXTRA_BINDS,
   maxOutputTokens: Number(process.env.OPENAI_MAX_OUTPUT_TOKENS) || undefined,

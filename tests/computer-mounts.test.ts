@@ -7,24 +7,29 @@ const raw =
 
 it('selects mounts per Dot, including unscoped ones', () => {
   expect(mountsFor(raw, 'roofers')).toEqual([
-    { host: '/c/Users/GENIUS/Rooferzs', path: 'genius/project', mode: 'rw' },
-    { host: '/srv/shared', path: 'genius/shared', mode: 'ro' },
+    {
+      host: '/c/Users/GENIUS/Rooferzs',
+      path: 'genius/project',
+      mode: 'rw',
+      scoped: true,
+    },
+    { host: '/srv/shared', path: 'genius/shared', mode: 'ro', scoped: false },
   ]);
   expect(mountsFor(raw, 'other')).toEqual([
-    { host: '/srv/shared', path: 'genius/shared', mode: 'ro' },
+    { host: '/srv/shared', path: 'genius/shared', mode: 'ro', scoped: false },
   ]);
   expect(mountsFor(undefined, 'roofers')).toEqual([]);
 });
 it('handles Windows drive-letter host paths', () => {
   expect(mountsFor('C:\\Users\\GENIUS:/workspace/genius', 'd')).toEqual([
-    { host: 'C:\\Users\\GENIUS', path: 'genius', mode: 'rw' },
+    { host: 'C:\\Users\\GENIUS', path: 'genius', mode: 'rw', scoped: false },
   ]);
 });
 it('omits secret-masking binds from the mounts a Dot is told about', () => {
   const masked =
     '/mnt/c/Users/GENIUS:/workspace/genius|/home/u/.opendots-empty:/workspace/genius/.ssh:ro|/dev/null:/workspace/genius/.gitconfig:ro';
   expect(mountsFor(masked, 'any')).toEqual([
-    { host: '/mnt/c/Users/GENIUS', path: 'genius', mode: 'rw' },
+    { host: '/mnt/c/Users/GENIUS', path: 'genius', mode: 'rw', scoped: false },
   ]);
 });
 it('tells the Dot where mounted folders live, and nothing when none', () => {
@@ -50,4 +55,32 @@ it('rejects host and absolute paths with an actionable message, accepts workspac
     computerInputs.files_list.safeParse({ path: 'genius/project/src' }).success,
   ).toBe(true);
   expect(computerInputs.files_list.safeParse({}).success).toBe(true);
+});
+
+it('accepts string booleans and numbers from weaker models, nothing looser', () => {
+  expect(
+    computerInputs.files_write.safeParse({
+      path: 'a.txt',
+      contents: 'x',
+      append: 'true',
+    }),
+  ).toMatchObject({ success: true, data: { append: true } });
+  expect(
+    computerInputs.exec.safeParse({ command: 'ls', timeoutMs: '45000' }),
+  ).toMatchObject({ success: true, data: { timeoutMs: 45000 } });
+  expect(computerInputs.exec.safeParse({ command: 'ls' })).toMatchObject({
+    success: true,
+    data: { timeoutMs: 30000 },
+  });
+  expect(
+    computerInputs.files_write.safeParse({
+      path: 'a.txt',
+      contents: 'x',
+      append: 'yes',
+    }).success,
+  ).toBe(false);
+  expect(
+    computerInputs.exec.safeParse({ command: 'ls', timeoutMs: '999999' })
+      .success,
+  ).toBe(false);
 });

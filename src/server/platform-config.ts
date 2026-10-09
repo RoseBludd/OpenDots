@@ -11,6 +11,10 @@ export interface PlatformConfig extends WebConfig {
   computerSupervisorToken?: string;
   computerToken?: string;
   computerProjectRoot?: string;
+  /** Let Dots push committed branches using the owner's host Git credentials. */
+  computerGitPush?: boolean;
+  /** Git executable the server uses for pushes (git.exe under WSL uses Windows credentials). */
+  computerHostGit?: string;
   computerNamespace?: string;
   computerMounts?: string;
   maxOutputTokens?: number;

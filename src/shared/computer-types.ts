@@ -41,6 +41,15 @@ const path = z
       !p.split('/').some((s) => s === '..'),
     'Use a path relative to the workspace root (for example genius/project/README.md), not a host path like C:\\... or an absolute path, and no "..".',
   );
+// Weaker models send "true" or "30000" as strings; accept those, nothing looser.
+const looseBoolean = z.preprocess(
+  (v) => (v === 'true' ? true : v === 'false' ? false : v),
+  z.boolean(),
+);
+const looseNumber = z.preprocess(
+  (v) => (typeof v === 'string' && /^\d+$/.test(v) ? Number(v) : v),
+  z.number(),
+);
 const empty = z.object({}).strict();
 const ref = {
   ref: z.string().min(1).max(100),
@@ -82,13 +91,28 @@ export const computerInputs = {
     .object({
       path: path.refine((p) => p.length > 0),
       contents: z.string().max(100000),
-      append: z.boolean().optional(),
+      append: looseBoolean.optional(),
+    })
+    .strict(),
+  git_push: z
+    .object({
+      path: path.default(''),
+      remote: z
+        .string()
+        .regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/)
+        .default('origin'),
+      branch: z
+        .string()
+        .regex(/^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$/)
+        .optional(),
     })
     .strict(),
   exec: z
     .object({
       command: z.string().trim().min(1).max(8000),
-      timeoutMs: z.number().int().min(1000).max(60000).default(30000),
+      timeoutMs: looseNumber
+        .pipe(z.number().int().min(1000).max(60000))
+        .default(30000),
     })
     .strict(),
   human_click: z

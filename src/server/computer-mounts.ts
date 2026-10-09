@@ -2,6 +2,8 @@ export interface ComputerMount {
   host: string;
   path: string;
   mode: 'ro' | 'rw';
+  /** Mounted for this Dot only (a dedicated project), not shared by every Dot. */
+  scoped: boolean;
 }
 
 // Mirrors the supervisor's COMPUTER_EXTRA_BINDS grammar (see
@@ -26,6 +28,7 @@ export function mountsFor(raw: string | undefined, dotId: string) {
       host,
       path: dest.slice('/workspace/'.length),
       mode: mode === 'ro' ? 'ro' : 'rw',
+      scoped: !!scoped,
     });
   }
   return mounts;
