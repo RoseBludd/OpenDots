@@ -63,7 +63,7 @@ export class DotAgent extends AbstractAgent {
       const computerWork =
         !!this.config.computerSupervisorUrl &&
         this.workspace.computers.permissions(this.dotId).enabled;
-      const budgetMs = computerWork ? 300_000 : 90_000;
+      const budgetMs = computerWork ? Number(process.env.DOT_RUN_BUDGET_MS) || 300_000 : 90_000;
       const timeout = setTimeout(() => {
         // Say why the run ended; an abort alone leaves the stream without a terminal event.
         subscriber.next(

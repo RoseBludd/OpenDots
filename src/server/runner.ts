@@ -53,9 +53,9 @@ export class Runner {
     const timeout = setTimeout(
       () =>
         controller.abort(
-          new Error('Research exceeded the 90 second time limit.'),
+          new Error('Task exceeded the TASK_TIMEOUT_MS time limit.'),
         ),
-      90_000,
+      Number(process.env.TASK_TIMEOUT_MS) || 90_000,
     );
     try {
       const settings = this.store.settings();
