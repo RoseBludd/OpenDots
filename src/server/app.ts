@@ -78,7 +78,7 @@ function inPrivateRanges(value: number): boolean {
     (value >= ipToLong('192.168.0.0')! && value <= ipToLong('192.168.255.255')!)
   );
 }
-function trustedTailnetSource(forwarded: string | undefined): boolean {function trustedTailnetSource(forwarded: string | undefined): boolean {
+function trustedTailnetSource(forwarded: string | undefined): boolean {
   if (!forwarded) return false; // direct edge access keeps the bearer gate
   return forwarded.split(',').every((raw) => {
     let ip = raw.trim().toLowerCase();
