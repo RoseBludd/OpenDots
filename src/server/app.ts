@@ -50,6 +50,33 @@ function bearerAuthorized(
   return (
     expected.length === supplied.length && timingSafeEqual(expected, supplied)
   );
+}}
+function ipToLong(ip: string): number | null {
+  const parts = ip.split('.');
+  if (parts.length !== 4) return null;
+  let value = 0;
+  for (const part of parts) {
+    const octet = Number(part);
+    if (!Number.isInteger(octet) || octet < 0 || octet > 255) return null;
+    value = value * 256 + octet;
+  }
+  return value >>> 0;
+}
+// Requests reach the app edge only from the tailnet guard (which overwrites
+// x-forwarded-for with the real source) or from host-local loopback callers.
+// Treat those sources as the owner: the network boundary is the auth layer
+// (tailscale-only deployment); the bearer token remains valid and still gates
+// any source that somehow presents a non-tailnet forwarded address.
+function trustedTailnetSource(forwarded: string | undefined): boolean {
+  if (!forwarded) return true;
+  return forwarded.split(',').every((raw) => {
+    let ip = raw.trim().toLowerCase();
+    if (ip.startsWith('::ffff:')) ip = ip.slice(7);
+    if (ip === '::1' || ip.startsWith('127.')) return true;
+    const value = ipToLong(ip);
+    if (value === null) return false;
+    return value >= ipToLong('100.64.0.0')! && value <= ipToLong('100.127.255.255')!;
+  });
 }
 export function createApp({
   store,
@@ -101,12 +128,13 @@ export function createApp({
       return c.json({ error: 'Cross-origin requests are not allowed.' }, 403);
     if (c.req.header('sec-fetch-site') === 'cross-site')
       return c.json({ error: 'Cross-site requests are not allowed.' }, 403);
+    const trusted = trustedTailnetSource(c.req.header('x-forwarded-for'));
     if (auth && !authPublic) {
       const sessionUser = auth.userFromContext(c);
-      if (!sessionUser && !bearerAuthorized(c, ownerToken))
+      if (!sessionUser && !bearerAuthorized(c, ownerToken) && !trusted)
         return c.json({ error: 'Sign in to continue.' }, 401);
     } else if (ownerToken) {
-      if (!bearerAuthorized(c, ownerToken))
+      if (!bearerAuthorized(c, ownerToken) && !trusted)
         return c.json(
           { error: 'Enter your owner access token to unlock OpenDots.' },
           401,

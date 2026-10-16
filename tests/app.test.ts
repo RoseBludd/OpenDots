@@ -33,7 +33,30 @@ describe('API boundaries', () => {
       ).status,
     ).toBe(200);
   });
-  it('blocks browser cross-origin requests and form posts', async () => {
+  it('blocks browser cross-origin requests and form posts', async () => {  it('treats tailnet and loopback sources as the owner without a token', async () => {
+    const { app } = fixture('private-token');
+    expect(
+      (await app.request('/api/state', { headers: { 'X-Forwarded-For': '100.86.225.40' } })).status,
+    ).toBe(200);
+    expect((await app.request('/api/state', { headers: { 'X-Forwarded-For': '127.0.0.1' } })).status).toBe(200);
+    expect((await app.request('/api/state')).status).toBe(200);
+  });
+  it('keeps requiring the token for non-tailnet forwarded sources', async () => {
+    const { app } = fixture('private-token');
+    expect(
+      (await app.request('/api/state', { headers: { 'X-Forwarded-For': '8.8.8.8' } })).status,
+    ).toBe(401);
+    expect(
+      (
+        await app.request('/api/state', {
+          headers: { 'X-Forwarded-For': '100.86.225.40, 8.8.8.8' },
+        })
+      ).status,
+    ).toBe(401);
+    expect(
+      (await app.request('/api/state', { headers: { 'X-Forwarded-For': 'not-an-ip' } })).status,
+    ).toBe(401);
+  });
     const { app } = fixture();
     expect(
       (
