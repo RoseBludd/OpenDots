@@ -82,3 +82,5 @@ sudo /root/bin/opendots-health.sh
 ```
 
 Never `docker system prune -af`; targeted `docker rmi` only. No secrets in argv, logs or R2.
+
+> **Build rule:** images are built with `docker build --target app -t opendots-app:<sha>-host .` from a checkout of this repo. The Dockerfile has a final `browser` stage (the Playwright /browse microservice); building without `--target app` produces the browser image, whose boot requires BROWSER_SECRET and will crash-loop the app service.
