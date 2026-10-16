@@ -1,4 +1,5 @@
 import { ComputerStore } from './computer-store.js';
+import { MemoryScopeStore } from './memory-scope/store.js';
 import { Pages } from './pages.js';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
@@ -10,6 +11,8 @@ export class WorkspaceStore {
   private db: DatabaseSync;
   readonly pages: Pages;
   readonly computers: ComputerStore;
+  /** Per-Dot memory scope (WO-02). */
+  readonly memoryScopes: MemoryScopeStore;
   constructor(
     path: string,
     readonly ownerId: string,
@@ -28,6 +31,8 @@ export class WorkspaceStore {
       ['dots', 'skillDeliveryEnabled', 'INTEGER NOT NULL DEFAULT 0'],
       ['dots', 'avatar', 'TEXT'],
       ['dots', 'projectPath', 'TEXT'],
+      ['dots', 'model', 'TEXT'],
+      ['dots', 'desk', 'TEXT'],
       ['thread_bindings', 'learningContainerId', 'TEXT'],
     ]) {
       if (
@@ -52,6 +57,7 @@ export class WorkspaceStore {
         COMMIT;`);
     }
     this.computers = new ComputerStore(this.db);
+    this.memoryScopes = new MemoryScopeStore(this.db);
     this.pages = new Pages(this.db, (id) =>
       this.spaces().some((space) => space.id === id),
     );
@@ -253,6 +259,22 @@ export class WorkspaceStore {
       this.db.exec('ROLLBACK');
       throw error;
     }
+    return this.dot(id)!;
+  }
+  /** Per-Dot model and desk (WO-03); undefined leaves a field unchanged. */
+  setDotModel(
+    id: string,
+    patch: { model?: string | null; desk?: string | null },
+  ): Dot {
+    const current = this.dot(id);
+    if (!current) throw new Error('Dot not found.');
+    this.db
+      .prepare('UPDATE dots SET model=?, desk=? WHERE id=?')
+      .run(
+        patch.model === undefined ? (current.model ?? null) : patch.model,
+        patch.desk === undefined ? (current.desk ?? null) : patch.desk,
+        id,
+      );
     return this.dot(id)!;
   }
   /** Removes a Dot with its local conversation bindings, calls, tasks and page threads. */

@@ -49,6 +49,8 @@ export interface Memory {
   id: string;
   text: string;
   createdAt: number;
+  /** Owning Dot; null or absent = global (visible to every Dot). */
+  dotId?: string | null;
 }
 export interface Detail {
   task: Task;
@@ -85,6 +87,10 @@ export interface Dot {
   avatar?: string | null;
   /** Host folder this Dot's computer is limited to, mounted at /workspace/project. */
   projectPath?: string | null;
+  /** Model override (see shared/dot-model.ts); null uses the server default. */
+  model?: string | null;
+  /** Desk whose key (CADIS_API_KEY_<DESK>) this Dot uses; null uses OPENAI_API_KEY. */
+  desk?: string | null;
 }
 export interface Conversation {
   id: string;
@@ -120,6 +126,9 @@ export interface WorkspaceState {
   conversations: Conversation[];
   setup: SetupStatus;
   calls: CallReceipt[];
+  /** Set when the server runs Dots on the model without Intelligence (WO-07). */
+  mode?: 'direct-model';
+  model?: { model: string; fallbackModel: string | null };
 }
 export type FamilyRole = 'guardian' | 'adult' | 'kid';
 export interface FamilyUser {

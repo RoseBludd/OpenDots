@@ -228,3 +228,11 @@ When `INTELLIGENCE_API_KEY` is empty and `OPENAI_API_KEY` is set, the server run
 - Tasks (`POST /api/tasks`, optionally with a `threadId`) run on the model; a bound task's prompt and result are added to its conversation.
 - Each turn is limited by `DOT_RUN_BUDGET_MS` (default 90 s) and tasks also by `TASK_TIMEOUT_MS`. A 5xx or an empty reply is retried once; `OPENAI_FALLBACK_MODEL` (default unset) is then tried once. Failures return a short error without upstream details.
 - No tools run in this mode. Live chat streaming in the app, voice, computers, pages and Dot/Space editing require Intelligence and answer `501`.
+
+## Per-Dot memory
+
+A memory is either global (visible to every Dot) or belongs to one Dot. Existing memories stay global. A Dot sees the global memories plus its own; a task that runs outside a conversation sees only the global ones.
+
+- `GET /api/memories?dotId=<id>` returns what that Dot can see; without `dotId` it returns every memory with its `dotId` (null = global).
+- `POST /api/memories` and `PUT /api/memories/:id` accept an optional `dotId` (null makes a memory global).
+- Seat import (dry run unless `--apply`; existing memories are never deleted or rescoped): `node --import tsx src/server/memory-scope/import-cli.ts --seats <seats dir> --rules <standing-rules.md> [--max 20] [--max-bytes 1500] [--apply]`. Each rule becomes a global memory. Each `seats/<desk>/` (BRIEF.md first, then other `.md` files) or `seats/<desk>.md` becomes up to `--max` memories for the Dot whose desk or name matches. The built server ships the same script as `dist/server/server/memory-scope/import-cli.js`.

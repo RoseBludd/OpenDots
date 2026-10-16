@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { Platform } from './platform.js';
 import { VoiceService } from './voice.js';
 import { resolveProjectPath } from './project-path.js';
+import { dotModelFields, dotModelSchema } from './dot-model.js';
 import {
   learningContainerIdSchema,
   validateLearningSettings,
@@ -20,6 +21,7 @@ const dotSchema = z
     projectPath: z.string().trim().max(300).nullable().optional(),
     spaceIds: z.array(z.string().min(1)).min(1).max(100).optional(),
     spaceId: z.string().min(1).optional(),
+    ...dotModelFields,
   })
   .strict();
 export function workspaceRoutes(platform: Platform, voice: VoiceService) {
@@ -96,19 +98,23 @@ export function workspaceRoutes(platform: Platform, voice: VoiceService) {
     }
     const project = projectFolder(data.data.projectPath);
     if (project.error) return c.json({ error: project.error }, 400);
+    const created = platform.workspace.createDot(
+      data.data.spaceId,
+      data.data.name,
+      data.data.instructions,
+      data.data.researchAllowed,
+      data.data.memoryAllowed,
+      data.data.spaceIds,
+      data.data.learningContainerId,
+      data.data.skillDeliveryEnabled,
+      data.data.avatar ?? null,
+      project.value ?? null,
+    );
     return c.json(
-      platform.workspace.createDot(
-        data.data.spaceId,
-        data.data.name,
-        data.data.instructions,
-        data.data.researchAllowed,
-        data.data.memoryAllowed,
-        data.data.spaceIds,
-        data.data.learningContainerId,
-        data.data.skillDeliveryEnabled,
-        data.data.avatar ?? null,
-        project.value ?? null,
-      ),
+      platform.workspace.setDotModel(created.id, {
+        model: data.data.model,
+        desk: data.data.desk,
+      }),
       201,
     );
   });
@@ -149,15 +155,34 @@ export function workspaceRoutes(platform: Platform, voice: VoiceService) {
     }
     const project = projectFolder(data.data.projectPath);
     if (project.error) return c.json({ error: project.error }, 400);
-    const updated = platform.workspace.updateDot(c.req.param('id'), {
-      ...data.data,
+    const { model, desk, ...settings } = data.data;
+    platform.workspace.updateDot(c.req.param('id'), {
+      ...settings,
       projectPath: project.value,
+    });
+    const updated = platform.workspace.setDotModel(c.req.param('id'), {
+      model,
+      desk,
     });
     if (project.value !== undefined && project.value !== current.projectPath)
       // Stop the old computer so a stale mount is never used; the next start
       // recreates it with the new folder (its files and logins are kept).
       await platform.computers.stop(current.id).catch(() => undefined);
     return c.json(updated);
+  });
+  app.put('/dots/:id/model', async (c) => {
+    const data = dotModelSchema.safeParse(await c.req.json().catch(() => null));
+    if (!data.success)
+      return c.json(
+        {
+          error:
+            'Choose a model (cadis-free or cadis) and an optional desk name (lowercase letters, digits, dashes).',
+        },
+        400,
+      );
+    if (!platform.workspace.dot(c.req.param('id')))
+      return c.json({ error: 'Dot not found.' }, 404);
+    return c.json(platform.workspace.setDotModel(c.req.param('id'), data.data));
   });
   app.post('/conversations', async (c) => {
     const data = z

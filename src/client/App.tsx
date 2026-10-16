@@ -34,7 +34,9 @@ import type {
 import { api, ApiError, authHeaders, setToken } from './api';
 import { Mascot } from './Mascot';
 import { Chat } from './Chat';
-import { ThreadList } from './ThreadList';
+import { DirectChat } from './DirectChat';
+import { DIRECT_MODE_NOTE, dotModelLabel, isDirectMode } from './direct-chat';
+import { LocalThreadList, ThreadList } from './ThreadList';
 import { ResultPane } from './ResultPane';
 import { TaskRow } from './TaskPresentation';
 import { TaskActions } from './TaskActions';
@@ -192,6 +194,10 @@ export function App() {
     (item) => item.id === selectedThread && item.dotId === dot?.id,
   );
   const configured = !!workspace && workspace.setup.missing.length === 0;
+  // Direct-model mode (no Intelligence): chat runs on the model directly;
+  // voice, computers, pages and Dot/Space editing are not offered.
+  const direct = isDirectMode(workspace);
+  const chatReady = configured || direct;
   const chooseDot = (next: Dot) => {
     setSelectedDot(next.id);
     setSelectedThread(
@@ -202,7 +208,7 @@ export function App() {
     setPendingPrompt(undefined);
   };
   const newConversation = async (text?: string) => {
-    if (!dot || !configured || busy) return;
+    if (!dot || !chatReady || busy) return;
     setBusy(true);
     setError('');
     try {
@@ -432,13 +438,15 @@ export function App() {
         </button>
         <button
           aria-label="New chat"
-          disabled={!configured}
+          disabled={!chatReady}
           onClick={() => void newConversation()}
         >
           <Plus size={19} />
         </button>
         <button
           aria-label="Open Spaces"
+          disabled={direct}
+          title={direct ? DIRECT_MODE_NOTE : undefined}
           onClick={() => {
             if (workspace.spaces[0]) openPage(workspace.spaces[0].id);
           }}
@@ -509,7 +517,7 @@ export function App() {
         </button>
         <button
           className="new-chat nav-item"
-          disabled={!configured}
+          disabled={!chatReady}
           onClick={() => void newConversation()}
         >
           <Plus size={17} />
@@ -517,15 +525,17 @@ export function App() {
         </button>
         <div className="spaces-heading nav-label">
           DOTS
-          <button
-            className="icon-button"
-            aria-label="Create Dot"
-            onClick={() =>
-              setDialog({ type: 'dot', spaceId: workspace.spaces[0].id })
-            }
-          >
-            <Plus size={14} />
-          </button>
+          {!direct && (
+            <button
+              className="icon-button"
+              aria-label="Create Dot"
+              onClick={() =>
+                setDialog({ type: 'dot', spaceId: workspace.spaces[0].id })
+              }
+            >
+              <Plus size={14} />
+            </button>
+          )}
         </div>
         <nav className="dots-nav" aria-label="Dots">
           {workspace.dots.map((item) => (
@@ -546,40 +556,67 @@ export function App() {
                 />
                 <span>{item.name}</span>
               </button>
-              <button
-                className="icon-button dot-settings"
-                aria-label={`Edit ${item.name} settings`}
-                onClick={() =>
-                  setDialog({ type: 'dot', dot: item, spaceId: item.spaceId })
-                }
-              >
-                <MoreHorizontal size={15} />
-              </button>
+              {!direct && (
+                <button
+                  className="icon-button dot-settings"
+                  aria-label={`Edit ${item.name} settings`}
+                  onClick={() =>
+                    setDialog({ type: 'dot', dot: item, spaceId: item.spaceId })
+                  }
+                >
+                  <MoreHorizontal size={15} />
+                </button>
+              )}
             </div>
           ))}
         </nav>
-        <div className="spaces-heading nav-label">
-          SPACES
-          <button
-            className="icon-button"
-            aria-label="Create Space"
-            onClick={() => setDialog({ type: 'space' })}
-          >
-            <Plus size={14} />
-          </button>
-        </div>
-        <nav className="spaces-nav" aria-label="Spaces">
-          {workspace.spaces.map((space) => (
-            <SpaceNav
-              key={space.id}
-              space={space}
-              active={view === 'space' && spaceId === space.id}
-              pageId={pageId}
-              onOpen={(id) => openPage(space.id, id)}
-            />
-          ))}
-        </nav>
-        {configured ? (
+        {direct ? (
+          <div className="sidebar-empty direct-mode-note">
+            {DIRECT_MODE_NOTE}
+          </div>
+        ) : (
+          <>
+            <div className="spaces-heading nav-label">
+              SPACES
+              <button
+                className="icon-button"
+                aria-label="Create Space"
+                onClick={() => setDialog({ type: 'space' })}
+              >
+                <Plus size={14} />
+              </button>
+            </div>
+            <nav className="spaces-nav" aria-label="Spaces">
+              {workspace.spaces.map((space) => (
+                <SpaceNav
+                  key={space.id}
+                  space={space}
+                  active={view === 'space' && spaceId === space.id}
+                  pageId={pageId}
+                  onOpen={(id) => openPage(space.id, id)}
+                />
+              ))}
+            </nav>
+          </>
+        )}
+        {direct ? (
+          <LocalThreadList
+            dotId={dot.id}
+            dots={workspace.dots}
+            local={workspace.conversations}
+            selected={view === 'chat' ? selectedThread : undefined}
+            onSelect={(id) => {
+              const conversation = workspace.conversations.find(
+                (item) => item.id === id,
+              );
+              if (conversation) setSelectedDot(conversation.dotId);
+              setSelectedThread(id);
+              setView('chat');
+              setMobile(false);
+            }}
+            onNew={() => void newConversation()}
+          />
+        ) : chatReady ? (
           <ThreadList
             dotId={dot.id}
             dots={workspace.dots}
@@ -664,7 +701,11 @@ export function App() {
           </div>
           <div className="top-actions">
             <span className="mode-badge">
-              {configured ? 'SELF-HOSTED' : 'SETUP REQUIRED'}
+              {direct
+                ? 'DIRECT MODEL'
+                : configured
+                  ? 'SELF-HOSTED'
+                  : 'SETUP REQUIRED'}
             </span>
             <button
               className="pause-button"
@@ -680,14 +721,16 @@ export function App() {
               {state.settings.paused ? <Play size={14} /> : <Pause size={14} />}
               <span>{state.settings.paused ? 'Resume' : 'Pause'}</span>
             </button>
-            <button
-              className="icon-button"
-              aria-label={pane ? 'Hide computer' : 'Show computer'}
-              aria-expanded={pane}
-              onClick={() => setPane(!pane)}
-            >
-              <Monitor size={18} />
-            </button>
+            {!direct && (
+              <button
+                className="icon-button"
+                aria-label={pane ? 'Hide computer' : 'Show computer'}
+                aria-expanded={pane}
+                onClick={() => setPane(!pane)}
+              >
+                <Monitor size={18} />
+              </button>
+            )}
           </div>
         </header>
         {error && (
@@ -707,7 +750,9 @@ export function App() {
             All Dots are paused. Active compute stops and scheduled tasks wait.
           </div>
         )}
-        {view === 'space' ? (
+        {view === 'space' && direct ? (
+          <div className="notice direct-mode-note">{DIRECT_MODE_NOTE}</div>
+        ) : view === 'space' ? (
           <SpaceWorkspace
             key={spaceId}
             space={
@@ -735,7 +780,21 @@ export function App() {
         ) : view === 'chat' ? (
           <div className={`chat-workspace ${pane ? 'split' : ''}`}>
             <div className="chat-column">
-              {thread && configured ? (
+              {thread && direct ? (
+                <DirectChat
+                  key={thread.id}
+                  thread={thread}
+                  dot={dot}
+                  model={dotModelLabel(dot, workspace)}
+                  initialPrompt={pendingPrompt}
+                  onConsumed={() => setPendingPrompt(undefined)}
+                  paused={state.settings.paused}
+                  onSaved={refresh}
+                  onSchedule={() =>
+                    setDialog({ type: 'schedule', threadId: thread.id })
+                  }
+                />
+              ) : thread && configured ? (
                 <Chat
                   key={thread.id}
                   thread={thread}
@@ -765,16 +824,22 @@ export function App() {
                     />
                     <h2>{dot.name}</h2>
                     <p>{dot.instructions}</p>
-                    <button
-                      className="text-button"
-                      onClick={() =>
-                        setDialog({ type: 'dot', dot, spaceId: dot.spaceId })
-                      }
-                    >
-                      Edit specialist <MoreHorizontal size={14} />
-                    </button>
+                    {direct ? (
+                      <p className="muted dot-model">
+                        Model: {dotModelLabel(dot, workspace)}
+                      </p>
+                    ) : (
+                      <button
+                        className="text-button"
+                        onClick={() =>
+                          setDialog({ type: 'dot', dot, spaceId: dot.spaceId })
+                        }
+                      >
+                        Edit specialist <MoreHorizontal size={14} />
+                      </button>
+                    )}
                   </div>
-                  {!configured && (
+                  {!chatReady && (
                     <div className="setup-card">
                       <span className="setup-icon">
                         <Settings2 size={20} />
@@ -806,14 +871,14 @@ export function App() {
                     <textarea
                       aria-label="Start a conversation"
                       placeholder={
-                        configured
+                        chatReady
                           ? `Message ${dot.name}…`
                           : 'Your first conversation starts after setup.'
                       }
                       value={prompt}
                       maxLength={4000}
                       onChange={(e) => setPrompt(e.target.value)}
-                      disabled={!configured}
+                      disabled={!chatReady}
                     />
                     <div className="composer-bottom">
                       <span>
@@ -823,7 +888,7 @@ export function App() {
                       <button
                         className="send-button"
                         aria-label="Start conversation"
-                        disabled={!configured || busy || !prompt.trim()}
+                        disabled={!chatReady || busy || !prompt.trim()}
                       >
                         <ArrowUp size={19} />
                       </button>
@@ -837,7 +902,7 @@ export function App() {
                     ].map((text) => (
                       <button
                         key={text}
-                        disabled={!configured}
+                        disabled={!chatReady}
                         onClick={() => setPrompt(text)}
                       >
                         {text}
@@ -860,7 +925,7 @@ export function App() {
                 </div>
               )}
             </div>
-            {pane && (
+            {pane && !direct && (
               <ResultPane
                 key={dot.id}
                 dots={workspace.dots}
@@ -1030,7 +1095,7 @@ export function App() {
             )}
           </main>
         )}
-        {pane && view !== 'chat' && (
+        {pane && !direct && view !== 'chat' && (
           <div className="computer-overlay">
             <ResultPane
               key={view === 'space' ? spaceId : dot.id}
