@@ -126,6 +126,9 @@ export interface WorkspaceState {
   conversations: Conversation[];
   setup: SetupStatus;
   calls: CallReceipt[];
+  /** Set when the server runs Dots on the model without Intelligence (WO-07). */
+  mode?: 'direct-model';
+  model?: { model: string; fallbackModel: string | null };
 }
 export type FamilyRole = 'guardian' | 'adult' | 'kid';
 export interface FamilyUser {
