@@ -20,6 +20,7 @@ import {
   directModeEnabled,
   directModelConfig,
 } from './direct-model/index.js';
+import { HandoffService } from './handoff/index.js';
 
 const host = process.env.HOST ?? '127.0.0.1';
 const port = Number(process.env.PORT ?? 4310);
@@ -150,6 +151,8 @@ const runner = new Runner(
   },
 );
 
+const handoff = new HandoffService(store, workspace);
+
 const wsOrigin = new URL(
   config.intelligenceWsUrl ?? 'wss://realtime.intelligence.copilotkit.ai',
 ).origin;
@@ -160,14 +163,12 @@ const app = createApp({
   config: researchConfig,
   ownerToken,
   origin:
-    process.env.APP_ORIGIN ??
-    (process.env.NODE_ENV === 'development'
-      ? 'http://127.0.0.1:5173'
-      : undefined),
+    process.env.APP_ORIGIN ?? (process.env.NODE_ENV === 'development' ? 'http://127.0.0.1:5173' : undefined),
   platform,
   direct,
   auth,
   familyMode,
+  handoff,
 });
 if (familyStore && auth)
   app.route(
