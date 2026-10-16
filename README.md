@@ -218,3 +218,13 @@ Parallel is selected by default in live research and Dot conversations. Ask a to
 `WEB_SEARCH_PROVIDER=browser` preserves the existing URL-only browser reader, and `WEB_SEARCH_PROVIDER=disabled` disables these research tools. Workspace and Dot research permissions, pause and cancellation controls still apply. Sample research remains fictional and does not contact a provider.
 
 Queries, requested URLs, a stable session identifier and the research objective are sent to `https://search.parallel.ai/mcp`. Memories and complete conversations are not automatically forwarded to Parallel. Model-selected objectives may still contain context from the conversation. The anonymous service is free for light use with provider-managed limits; set `PARALLEL_API_KEY` on the server for production or higher limits. Provider errors and empty results are reported rather than replaced with invented evidence. See [Parallel Search MCP documentation](https://docs.parallel.ai/integrations/mcp/search-mcp).
+
+## Direct-model mode
+
+When `INTELLIGENCE_API_KEY` is empty and `OPENAI_API_KEY` is set, the server runs Dot conversations and background tasks on the OpenAI-compatible model directly (`src/server/direct-model/`). With the Intelligence key set, nothing changes.
+
+- `GET /api/state` reports `mode: "direct-model"`; `GET /api/workspace` lists Spaces, Dots and conversations.
+- `POST /api/conversations` creates a local conversation for a Dot. `POST /api/conversations/:id/messages` with `{"content": "..."}` returns the reply; add `"stream": true` (or `Accept: text/event-stream`) for `delta`/`done`/`error` server-sent events. `GET /api/conversations/:id/messages` returns the stored history, which is kept in the same SQLite database.
+- Tasks (`POST /api/tasks`, optionally with a `threadId`) run on the model; a bound task's prompt and result are added to its conversation.
+- Each turn is limited by `DOT_RUN_BUDGET_MS` (default 90 s) and tasks also by `TASK_TIMEOUT_MS`. A 5xx or an empty reply is retried once; `OPENAI_FALLBACK_MODEL` (default unset) is then tried once. Failures return a short error without upstream details.
+- No tools run in this mode. Live chat streaming in the app, voice, computers, pages and Dot/Space editing require Intelligence and answer `501`.

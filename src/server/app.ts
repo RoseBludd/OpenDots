@@ -11,6 +11,8 @@ import { VoiceService } from './voice.js';
 import { workspaceRoutes } from './workspace-routes.js';
 import { authRoutes } from './auth-routes.js';
 import type { AuthStore } from './auth-store.js';
+import type { DirectModel } from './direct-model/index.js';
+import { directModelRoutes } from './direct-model/routes.js';
 const interval = z.number().int().min(60).max(31_536_000).nullable();
 export interface AppOptions {
   store: Store;
@@ -19,6 +21,8 @@ export interface AppOptions {
   ownerToken?: string;
   origin?: string;
   platform?: Platform;
+  /** Direct-model mode (no Intelligence key); ignored when a platform exists. */
+  direct?: DirectModel;
   auth?: AuthStore;
   familyMode?: boolean;
 }
@@ -42,9 +46,11 @@ export function createApp({
   ownerToken,
   origin,
   platform,
+  direct: directOption,
   auth,
   familyMode = false,
 }: AppOptions) {
+  const direct = platform ? undefined : directOption;
   const app = new Hono();
   if (auth) app.route('/api/auth', authRoutes(auth, origin));
   app.use(
@@ -98,13 +104,14 @@ export function createApp({
   if (platform) app.route('/api', computerRoutes(platform.computers));
   const voice = platform ? new VoiceService(platform) : undefined;
   if (platform && voice) app.route('/api', workspaceRoutes(platform, voice));
+  if (direct) app.route('/api', directModelRoutes(direct));
   app.get('/api/state', (c) =>
     c.json({
       settings: store.settings(),
       tasks: store.tasks(),
       memories: store.memories(),
-      mode: config.mode,
-      configured: configured(config),
+      mode: direct ? direct.mode : config.mode,
+      configured: direct ? true : configured(config),
     }),
   );
   app.post('/api/tasks', async (c) => {
@@ -146,12 +153,24 @@ export function createApp({
         );
       }
     }
+    if (direct && parsed.data.threadId) {
+      try {
+        direct.workspace.requireThread(parsed.data.threadId);
+      } catch {
+        return c.json(
+          { error: 'Conversation is not owned by this workspace.' },
+          403,
+        );
+      }
+    }
     const task = store.createTask(
       parsed.data.prompt,
       parsed.data.intervalSeconds,
     );
     if (platform && parsed.data.threadId)
       platform.workspace.bindTask(task.id, parsed.data.threadId);
+    if (direct && parsed.data.threadId)
+      direct.workspace.bindTask(task.id, parsed.data.threadId);
     return c.json(task, 201);
   });
   app.get('/api/tasks/:id', (c) => {

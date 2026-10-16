@@ -14,6 +14,12 @@ import type { PlatformConfig } from './platform-config.js';
 import { AuthStore } from './auth-store.js';
 import { applyFamilyPackage, loadFamilyPackage } from './family-bootstrap.js';
 import { storageAdapterFromEnv } from './storage-adapter.js';
+import {
+  DirectModel,
+  DirectThreadStore,
+  directModeEnabled,
+  directModelConfig,
+} from './direct-model/index.js';
 
 const host = process.env.HOST ?? '127.0.0.1';
 const port = Number(process.env.PORT ?? 4310);
@@ -113,10 +119,24 @@ const researchConfig = {
   browserSecret: config.browserSecret,
 };
 
+// No Intelligence key but a model key: Dots and tasks call the model directly.
+const direct =
+  !platform && directModeEnabled(config)
+    ? new DirectModel({
+        store,
+        workspace,
+        threads: new DirectThreadStore(database),
+        model: directModelConfig(config),
+        research: researchConfig,
+        platformConfig: config,
+      })
+    : undefined;
+
 const runner = new Runner(
   store,
   researchConfig,
-  async (claim, _memories, signal, progress) => {
+  async (claim, memories, signal, progress) => {
+    if (direct) return direct.execute(claim, memories, signal, progress);
     const threadId = workspace.taskThread(claim.id);
     if (!threadId)
       throw new Error(
@@ -145,6 +165,7 @@ const app = createApp({
       ? 'http://127.0.0.1:5173'
       : undefined),
   platform,
+  direct,
   auth,
   familyMode,
 });
