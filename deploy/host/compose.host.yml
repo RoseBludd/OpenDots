@@ -1,0 +1,85 @@
+# OpenDots on genius-substrates-host (oppi., 2026-10-16; WO-TWIN-01 canonical copy).
+# Headless, containerized, tailnet/loopback only.
+# Images: built on TRILL from RoseBludd/OpenDots 3ad004a + TRILL local run-cap patch (opendots-trill-local.patch),
+# OpenBot supervisor/computer pinned b6932d3. Secrets only in ./.env (0600). Caps: app 0.5 CPU/768M, supervisor 0.25/256M,
+# computers 1G each (COMPUTER_MEMORY_BYTES) + 0.5 CPU and max 2 running via /root/bin/opendots-cap-guard.sh (cron).
+# WO-TWIN-01: the app edge is loopback-only (127.0.0.1:4321); the tailnet-guard sidecar (same app image,
+# network_mode host) owns the only public edge on 127.0.0.1:4320 + 100.86.225.40:4320 and refuses
+# non-tailnet sources (100.64.0.0/10 + loopback allowed).
+name: opendots-host
+services:
+  app:
+    image: opendots-app:3ad004a-trillpatch
+    env_file: .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: '4310'
+      DATABASE_PATH: /data/opendots.sqlite
+      COMPUTER_SUPERVISOR_URL: http://computer-supervisor:4300
+      COMPUTER_NAMESPACE: odhost
+      TASK_TIMEOUT_MS: '1860000'
+      DOT_RUN_BUDGET_MS: '1800000'
+      OPENAI_BASE_URL: https://cadis.geniuzs.com/v1
+      OPENAI_MODEL: cadis-free
+      WEB_SEARCH_PROVIDER: parallel
+    ports:
+      - '127.0.0.1:4321:4310'
+    volumes:
+      - opendots-data:/data
+    networks: [computer-control, computers, app-egress]
+    init: true
+    restart: unless-stopped
+    cpus: 0.5
+    mem_limit: 768m
+    memswap_limit: 1g
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+  tailnet-guard:
+    image: opendots-app:3ad004a-trillpatch
+    entrypoint: ['node', '/guard/tailnet-guard.mjs']
+    network_mode: host
+    environment:
+      TAILNET_IP: 100.86.225.40
+      GUARD_PORT: '4320'
+      APP_EDGE_HOST: 127.0.0.1
+      APP_EDGE_PORT: '4321'
+    volumes:
+      - ./tailnet-guard.mjs:/guard/tailnet-guard.mjs:ro
+    init: true
+    restart: unless-stopped
+    cpus: 0.1
+    mem_limit: 64m
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:4320/').then(r=>process.exit([200,301,302,401,404].includes(r.status)?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+  computer-supervisor:
+    image: opendots-supervisor:b6932d3-dot-auth
+    env_file: .env
+    environment:
+      PORT: '4300'
+      COMPUTER_NAMESPACE: odhost
+      COMPUTER_IMAGE: opendots-computer:b6932d3-dev
+      COMPUTER_BROWSER_MODE: headless
+      COMPUTER_NETWORK: odhost-computers
+      COMPUTER_MEMORY_BYTES: '1073741824'
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks: [computer-control]
+    init: true
+    restart: unless-stopped
+    cpus: 0.25
+    mem_limit: 256m
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+networks:
+  computer-control:
+    internal: true
+  computers:
+    name: odhost-computers
+  app-egress: {}
+volumes:
+  opendots-data: {}
