@@ -11,5 +11,7 @@ COPY deployment/computers/add-extra-binds.mjs /tmp/add-extra-binds.mjs
 RUN bun /tmp/add-extra-binds.mjs /app/src/docker.ts
 COPY deployment/computers/add-project-binds.mjs /tmp/add-project-binds.mjs
 RUN bun /tmp/add-project-binds.mjs /app/src/docker.ts /app/src/index.ts
+COPY deployment/computers/check-supervisor-health.mjs /tmp/check-supervisor-health.mjs
+RUN bun /tmp/check-supervisor-health.mjs /app/src/index.ts && rm /tmp/check-supervisor-health.mjs
 EXPOSE 4300
 CMD ["bun", "src/index.ts"]

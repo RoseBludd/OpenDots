@@ -16,10 +16,13 @@ import {
   DirectThreadStore,
 } from '../src/server/direct-model/index.js';
 import {
+  dotForDesk,
   importSeatMemories,
+  normalizeMemory,
   rules,
   sections,
 } from '../src/server/memory-scope/import.js';
+import type { Dot } from '../src/shared/types.js';
 import { boundedText } from '../src/server/memory-scope/bounded.js';
 import type { Config } from '../src/server/research.js';
 
@@ -324,7 +327,7 @@ describe('seat and standing-rule import', () => {
     const dry = importSeatMemories(store, workspace, options);
     expect(dry.apply).toBe(false);
     expect(store.memories()).toHaveLength(1);
-    expect(dry.globals.added).toBe(3);
+    expect(dry.globals.new).toBe(3);
     const applied = importSeatMemories(store, workspace, {
       ...options,
       apply: true,
@@ -332,10 +335,16 @@ describe('seat and standing-rule import', () => {
     expect(applied.unmatchedDesks).toEqual(['ghost']);
     expect(applied.otherGlobals).toBe(1);
     const devvyRow = applied.desks.find((d) => d.desk === 'devvy')!;
-    expect(devvyRow).toMatchObject({ dotId: devvy.id, added: 3, truncated: 1 });
+    expect(devvyRow).toMatchObject({
+      dotId: devvy.id,
+      matchedBy: 'name',
+      new: 3,
+      truncated: 1,
+    });
     expect(applied.desks.find((d) => d.desk === 'sec')).toMatchObject({
       dotId: sec.id,
-      added: 1,
+      matchedBy: 'desk',
+      new: 1,
     });
     const visible = (dotId: string | null) =>
       workspace.memoryScopes.visible(store.memories(), dotId);
@@ -364,8 +373,71 @@ describe('seat and standing-rule import', () => {
       ...options,
       apply: true,
     });
-    expect(again.globals).toEqual({ added: 0, skipped: 3 });
-    expect(again.desks.every((d) => d.added === 0)).toBe(true);
+    expect(again.globals).toEqual({ new: 0, skippedDuplicate: 3 });
+    expect(again.desks.every((d) => d.new === 0)).toBe(true);
+  });
+
+  it('matches host Dot names by desk field, then name pattern', () => {
+    const dot = (name: string, desk: string | null = null) =>
+      ({ id: name, name, desk }) as unknown as Dot;
+    const dots = [
+      dot('oppi. (desk)'),
+      dot('Devvy.'),
+      dot('Lead'),
+      dot('Ops (Desk)'),
+      dot('Other', 'lead'),
+    ];
+    expect(dotForDesk(dots, 'oppi')?.dot.name).toBe('oppi. (desk)');
+    expect(dotForDesk(dots, 'devvy')?.matchedBy).toBe('name');
+    expect(dotForDesk(dots, 'ops')?.dot.name).toBe('Ops (Desk)');
+    expect(dotForDesk(dots, 'lead')).toMatchObject({
+      matchedBy: 'desk',
+      dot: { name: 'Other' },
+    });
+    expect(dotForDesk(dots, 'opp')).toBeUndefined();
+    expect(dotForDesk([dot('oppi. (desk) old')], 'oppi')).toBeUndefined();
+    expect(normalizeMemory('  2.  No   SENDS without OK. ')).toBe(
+      normalizeMemory('- no sends without ok.'),
+    );
+  });
+
+  it('skips standing rules already among globals and sets empty desks only with --set-desk', () => {
+    const { seats, rulesFile, store, workspace, devvy, sec } = setup();
+    store.saveMemory('  cadis   ONLY. ');
+    const host = workspace.createDot(
+      workspace.spaces()[0].id,
+      'oppi. (desk)',
+      'Host desk Dot.',
+      true,
+      true,
+    );
+    mkdirSync(join(seats, 'oppi'));
+    writeFileSync(join(seats, 'oppi', 'BRIEF.md'), '## Role\nRuns the desk.\n');
+    const base = { seatsDir: seats, rulesFile, apply: true };
+    const withoutFlag = importSeatMemories(store, workspace, base);
+    expect(withoutFlag.globals).toEqual({ new: 2, skippedDuplicate: 1 });
+    expect(withoutFlag.desks.every((row) => row.setDesk === null)).toBe(true);
+    expect(workspace.dot(host.id)?.desk ?? null).toBeNull();
+    expect(
+      store.memories().filter((m) => normalizeMemory(m.text) === 'cadis only.'),
+    ).toHaveLength(1);
+    const dry = importSeatMemories(store, workspace, {
+      ...base,
+      apply: false,
+      setDesk: true,
+    });
+    expect(dry.desks.find((row) => row.desk === 'oppi')).toMatchObject({
+      dotId: host.id,
+      setDesk: 'oppi',
+      new: 0,
+      skippedDuplicate: 1,
+    });
+    expect(dry.desks.find((row) => row.desk === 'sec')?.setDesk).toBeNull();
+    expect(workspace.dot(host.id)?.desk ?? null).toBeNull();
+    importSeatMemories(store, workspace, { ...base, setDesk: true });
+    expect(workspace.dot(host.id)?.desk).toBe('oppi');
+    expect(workspace.dot(devvy.id)?.desk).toBe('devvy');
+    expect(workspace.dot(sec.id)?.desk).toBe('sec');
   });
 
   it('caps text by bytes without splitting UTF-8 characters', () => {

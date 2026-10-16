@@ -14,7 +14,12 @@ import {
   DirectThreadStore,
 } from '../src/server/direct-model/index.js';
 import type { Config } from '../src/server/research.js';
-import type { Conversation, Dot } from '../src/shared/types';
+import type {
+  Conversation,
+  Dot,
+  State,
+  WorkspaceState,
+} from '../src/shared/types';
 
 vi.hoisted(() => {
   const memory = new Map<string, string>();
@@ -34,10 +39,13 @@ type ClientModule = typeof import('../src/client/direct-chat');
 let client: ClientModule;
 let DirectChat: typeof import('../src/client/DirectChat').DirectChat;
 let LocalThreadList: typeof import('../src/client/ThreadList').LocalThreadList;
+let WorkspaceDialog: typeof import('../src/client/WorkspaceDialog').WorkspaceDialog;
 beforeAll(async () => {
   client = await import('../src/client/direct-chat');
   DirectChat = (await import('../src/client/DirectChat')).DirectChat;
   LocalThreadList = (await import('../src/client/ThreadList')).LocalThreadList;
+  WorkspaceDialog = (await import('../src/client/WorkspaceDialog'))
+    .WorkspaceDialog;
 });
 
 const cleanups: (() => void | Promise<void>)[] = [];
@@ -298,5 +306,114 @@ describe('direct-model chat panel', () => {
     );
     expect(html).toContain('Desk thread');
     expect(html).not.toContain('Conversation sync unavailable');
+  });
+});
+
+describe('Dot editor in direct-model mode', () => {
+  const dot = {
+    id: 'dot-1',
+    spaceId: 's',
+    spaceIds: ['s'],
+    name: 'oppi. (desk)',
+    instructions: 'Runs the desk.',
+    researchAllowed: true,
+    memoryAllowed: true,
+    createdAt: 1,
+    model: 'cadis',
+    desk: 'oppi',
+  } as Dot;
+  const render = (mode?: 'direct-model') =>
+    renderToStaticMarkup(
+      <WorkspaceDialog
+        dialog={{ type: 'dot', dot, spaceId: 's' }}
+        state={
+          { settings: { researchAllowed: true, memoryAllowed: true } } as State
+        }
+        workspace={
+          {
+            mode,
+            spaces: [{ id: 's', name: 'Home' }],
+            dots: [dot, { ...dot, id: 'dot-2' }],
+            conversations: [],
+          } as unknown as WorkspaceState
+        }
+        onClose={() => undefined}
+        mutate={async () => true}
+      />,
+    );
+
+  it('shows only name, instructions and model in direct mode', () => {
+    const html = render('direct-model');
+    expect(html).toContain('value="oppi. (desk)"');
+    expect(html).toContain('Runs the desk.');
+    expect(html).toContain('<legend>Model</legend>');
+    expect(html).toContain('value="oppi"');
+    for (const hidden of [
+      '<legend>Character</legend>',
+      '<legend>Project folder</legend>',
+      '<legend>Space access</legend>',
+      '<legend>Automatic Learning</legend>',
+      'danger-zone',
+    ])
+      expect(html).not.toContain(hidden);
+    const full = render();
+    for (const shown of [
+      '<legend>Space access</legend>',
+      '<legend>Project folder</legend>',
+      'danger-zone',
+    ])
+      expect(full).toContain(shown);
+  });
+
+  it('saves name, instructions, model and desk through the direct routes', async () => {
+    const { app, workspace, dot: real } = await backend();
+    const calls: string[] = [];
+    const mutate = async (path: string, method: string, body?: unknown) => {
+      calls.push(`${method} ${path}`);
+      const response = await app.request(`/api${path}`, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return response.ok;
+    };
+    expect(
+      await client.saveDirectDot(mutate, real.id, {
+        name: 'oppi. (desk)',
+        instructions: 'Runs the desk.',
+        model: 'cadis',
+        desk: ' Oppi ',
+      }),
+    ).toBe(true);
+    expect(calls).toEqual([
+      `PATCH /dots/${real.id}`,
+      `PUT /dots/${real.id}/model`,
+    ]);
+    expect(workspace.dot(real.id)).toMatchObject({
+      name: 'oppi. (desk)',
+      instructions: 'Runs the desk.',
+      model: 'cadis',
+      desk: 'oppi',
+    });
+    expect(
+      await client.saveDirectDot(mutate, real.id, {
+        name: 'oppi.',
+        instructions: 'Runs the desk.',
+        model: '',
+        desk: '',
+      }),
+    ).toBe(true);
+    expect(workspace.dot(real.id)?.model ?? null).toBeNull();
+    expect(workspace.dot(real.id)?.desk ?? null).toBeNull();
+    calls.length = 0;
+    expect(
+      await client.saveDirectDot(mutate, real.id, {
+        name: '',
+        instructions: 'Runs the desk.',
+        model: 'cadis',
+        desk: '',
+      }),
+    ).toBe(false);
+    expect(calls).toEqual([`PATCH /dots/${real.id}`]);
   });
 });

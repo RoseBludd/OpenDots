@@ -11,6 +11,7 @@ import type {
   WorkspaceState,
 } from '../shared/types';
 import { api } from './api';
+import { isDirectMode, saveDirectDot } from './direct-chat';
 export type Dialog =
   | { type: 'space' }
   | { type: 'dot'; dot?: Dot; spaceId: string }
@@ -80,6 +81,9 @@ export function WorkspaceDialog({
     dialog.type === 'dot' ? (dialog.dot?.desk ?? '') : '',
   );
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Direct-model mode: only name, instructions and model are editable (the
+  // rest needs Intelligence), saved via PATCH /dots/:id + PUT /dots/:id/model.
+  const directDot = dialog.type === 'dot' && isDirectMode(workspace);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const isGuardian = familyUser?.role === 'guardian';
@@ -211,6 +215,21 @@ export function WorkspaceDialog({
             e.preventDefault();
             setBusy(true);
             setError('');
+            if (directDot && dialog.type === 'dot' && dialog.dot) {
+              const saved = await saveDirectDot(mutate, dialog.dot.id, {
+                name,
+                instructions: text,
+                model: dotModel,
+                desk,
+              });
+              if (saved) onClose();
+              else
+                setError(
+                  'Could not save. Review the workspace error and retry.',
+                );
+              setBusy(false);
+              return;
+            }
             let path = '',
               method = 'POST',
               body: unknown;
@@ -276,7 +295,7 @@ export function WorkspaceDialog({
               />
             </>
           )}
-          {dialog.type === 'dot' && (
+          {dialog.type === 'dot' && !directDot && (
             <fieldset className="character-picker">
               <legend>Character</legend>
               <div className="character-options">
@@ -329,7 +348,7 @@ export function WorkspaceDialog({
               />
             </>
           )}
-          {dialog.type === 'dot' && (
+          {dialog.type === 'dot' && !directDot && (
             <fieldset className="space-access-fields">
               <legend>Project folder</legend>
               <label className="field-label" htmlFor="project-path">
@@ -397,7 +416,7 @@ export function WorkspaceDialog({
               </button>
             </p>
           )}
-          {dialog.type === 'dot' && (
+          {dialog.type === 'dot' && !directDot && (
             <fieldset className="space-access-fields">
               <legend>Space access</legend>
               <p className="muted">
@@ -442,7 +461,8 @@ export function WorkspaceDialog({
               </select>
             </fieldset>
           )}
-          {(dialog.type === 'dot' || dialog.type === 'settings') && (
+          {((dialog.type === 'dot' && !directDot) ||
+            dialog.type === 'settings') && (
             <>
               <label className="permission-row">
                 <input
@@ -474,7 +494,7 @@ export function WorkspaceDialog({
               </label>
             </>
           )}
-          {dialog.type === 'dot' && (
+          {dialog.type === 'dot' && !directDot && (
             <fieldset className="space-access-fields">
               <legend>Automatic Learning</legend>
               <label className="field-label" htmlFor="learning-container">
@@ -696,7 +716,7 @@ export function WorkspaceDialog({
             {busy ? 'Saving…' : 'Save'}
           </button>
         </form>
-        {dialog.type === 'dot' && dialog.dot && (
+        {dialog.type === 'dot' && dialog.dot && !directDot && (
           <div className="danger-zone">
             {workspace.dots.length <= 1 ? (
               <p className="muted">Keep at least one Dot in your workspace.</p>

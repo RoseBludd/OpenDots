@@ -6,11 +6,15 @@ import { streamSSE } from 'hono/streaming';
 import { z } from 'zod';
 import { DirectModel, DirectModelError } from './index.js';
 import { dotModelSchema } from '../dot-model.js';
+import { dotSchema } from '../workspace-routes.js';
 
 const requiresIntelligence = (feature: string) => ({
   error: `${feature} requires Intelligence (INTELLIGENCE_API_KEY). This server is running in direct-model mode, which supports Dot conversations and tasks.`,
   mode: 'direct-model',
 });
+
+/** Name and instructions only, with the same limits as the full Dot editor. */
+const dotText = dotSchema.pick({ name: true, instructions: true }).strict();
 
 const message = z
   .object({
@@ -136,6 +140,28 @@ export function directModelRoutes(direct: DirectModel) {
     if (!workspace.dot(c.req.param('id')))
       return c.json({ error: 'Dot not found.' }, 404);
     return c.json(workspace.setDotModel(c.req.param('id'), data.data));
+  });
+  // Rename / re-instruct a Dot. Everything else (spaces, learning, avatar,
+  // project folder) needs Intelligence and stays as it is.
+  app.patch('/dots/:id', async (c) => {
+    const data = dotText.safeParse(await c.req.json().catch(() => null));
+    if (!data.success)
+      return c.json(
+        {
+          error:
+            'Use a name (1-40 characters) and instructions (3-2000 characters).',
+        },
+        400,
+      );
+    const current = workspace.dot(c.req.param('id'));
+    if (!current) return c.json({ error: 'Dot not found.' }, 404);
+    return c.json(
+      workspace.updateDot(current.id, {
+        ...data.data,
+        researchAllowed: current.researchAllowed,
+        memoryAllowed: current.memoryAllowed,
+      }),
+    );
   });
   app.get('/conversations/:id/capture', (c) =>
     owned(c.req.param('id'))

@@ -218,4 +218,52 @@ describe('per-Dot model on the direct-model path', () => {
       ).status,
     ).toBe(404);
   });
+
+  it('renames and re-instructs a Dot in direct mode without touching other fields', async () => {
+    const endpoint = await stub();
+    const { app, workspace } = fixture(endpoint.url);
+    const before = workspace.dots()[0];
+    workspace.setDotModel(before.id, { model: 'cadis', desk: 'devvy' });
+    const edit = await app.request(
+      `/api/dots/${before.id}`,
+      send('PATCH', { name: ' Desk Dot ', instructions: 'Handle the desk.' }),
+    );
+    expect(edit.status).toBe(200);
+    const after = workspace.dot(before.id)!;
+    expect(after).toMatchObject({
+      name: 'Desk Dot',
+      instructions: 'Handle the desk.',
+      researchAllowed: before.researchAllowed,
+      memoryAllowed: before.memoryAllowed,
+      spaceId: before.spaceId,
+      spaceIds: before.spaceIds,
+      model: 'cadis',
+      desk: 'devvy',
+    });
+    for (const body of [
+      { name: '', instructions: 'Handle the desk.' },
+      { name: 'x'.repeat(41), instructions: 'Handle the desk.' },
+      { name: 'Ok', instructions: 'no' },
+      { name: 'Ok', instructions: 'Handle it.', researchAllowed: false },
+      { name: 'Ok' },
+    ])
+      expect(
+        (await app.request(`/api/dots/${before.id}`, send('PATCH', body)))
+          .status,
+      ).toBe(400);
+    expect(
+      (
+        await app.request(
+          '/api/dots/nope',
+          send('PATCH', { name: 'Ok', instructions: 'Handle it.' }),
+        )
+      ).status,
+    ).toBe(404);
+    expect(
+      (await app.request(`/api/dots/${before.id}`, send('PUT', {}))).status,
+    ).toBe(501);
+    expect(
+      (await app.request(`/api/dots/${before.id}`, send('DELETE', {}))).status,
+    ).toBe(501);
+  });
 });

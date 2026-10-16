@@ -9,7 +9,7 @@ import {
   learningContainerIdSchema,
   validateLearningSettings,
 } from '../shared/learning.js';
-const dotSchema = z
+export const dotSchema = z
   .object({
     name: z.string().trim().min(1).max(40),
     instructions: z.string().trim().min(3).max(2000),

@@ -20,6 +20,27 @@ export function isDirectMode(workspace?: Pick<WorkspaceState, 'mode'>) {
   return workspace?.mode === 'direct-model';
 }
 
+/**
+ * Save the Dot editor in direct-model mode: name and instructions via
+ * PATCH /dots/:id, then model and desk via PUT /dots/:id/model (WO-03).
+ */
+export async function saveDirectDot(
+  mutate: (path: string, method: string, body?: unknown) => Promise<boolean>,
+  id: string,
+  fields: { name: string; instructions: string; model: string; desk: string },
+) {
+  return (
+    (await mutate(`/dots/${id}`, 'PATCH', {
+      name: fields.name,
+      instructions: fields.instructions,
+    })) &&
+    (await mutate(`/dots/${id}/model`, 'PUT', {
+      model: fields.model || null,
+      desk: fields.desk.trim().toLowerCase() || null,
+    }))
+  );
+}
+
 /** Model shown for a Dot: its own choice (WO-03), else the server default. */
 export function dotModelLabel(
   dot: { model?: string | null },
