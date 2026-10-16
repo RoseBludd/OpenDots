@@ -32,9 +32,14 @@ Reuses (existing components):
    `100.64.0.0/10` (the Tailscale CGNAT range) gets `HTTP/1.1 403` and is destroyed.
    A curl against any other host interface (e.g. the public `eth0` IP) is refused —
    nothing listens there.
-3. The owner bearer token (`OWNER_TOKEN` in `/mnt/genius_vol_2/opendots/.env`, 0600) is
-   unchanged and still required by `/api/*`. Scripts read it into a curl `--config` file
-   (mode 600) instead of argv so it never appears in process listings or logs.
+3. Owner identity at the app layer: the guard overwrites `x-forwarded-for` with the real
+   source, and the app treats a request as the owner when every forwarded hop is loopback
+   or `100.64.0.0/10` (2026-10-16, Juelzs: the page must open without a token prompt).
+   The owner bearer token (`OWNER_TOKEN` in `/mnt/genius_vol_2/opendots/.env`, 0600) is
+   still honored — scripts keep reading it into a curl `--config` file (mode 600) instead
+   of argv so it never appears in process listings or logs — and requests with a
+   non-tailnet forwarded address (i.e. not via the guard) or no forwarded header at all
+   still require it.
 
 ## Nightly sqlite→R2 backup (`backup-r2.sh`)
 
