@@ -5,6 +5,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { Store } from './store.js';
 import { Runner } from './runner.js';
+import { parseCron, validTz } from './cron.js';
 import { configured, type Config } from './research.js';
 import type { Platform } from './platform.js';
 import { VoiceService } from './voice.js';
@@ -132,6 +133,9 @@ export function createApp({
         prompt: z.string().trim().min(3).max(4000),
         intervalSeconds: interval.optional(),
         threadId: z.string().optional(),
+        dotId: z.string().min(1).optional(),
+        cron: z.string().optional(),
+        tz: z.string().optional(),
       })
       .strict()
       .safeParse(await c.req.json().catch(() => null));
@@ -145,6 +149,14 @@ export function createApp({
       );
     if (!store.settings().researchAllowed)
       return c.json({ error: 'Research is disabled in Settings.' }, 403);
+    if (parsed.data.cron && !parseCron(parsed.data.cron))
+      return c.json(
+        { error: 'Use a 5-field cron expression, e.g. "30 9 * * *".' },
+        400,
+      );
+    if (parsed.data.tz && !validTz(parsed.data.tz))
+      return c.json({ error: 'Use a valid IANA time zone name.' }, 400);
+    let dotId = parsed.data.dotId ?? null;
     if (platform) {
       if (platform.setup().missing.length)
         return c.json(
@@ -157,7 +169,9 @@ export function createApp({
           400,
         );
       try {
-        platform.workspace.requireThread(parsed.data.threadId);
+        dotId =
+          dotId ??
+          platform.workspace.requireThread(parsed.data.threadId).dotId;
       } catch {
         return c.json(
           { error: 'Conversation is not owned by this workspace.' },
@@ -167,7 +181,7 @@ export function createApp({
     }
     if (direct && parsed.data.threadId) {
       try {
-        direct.workspace.requireThread(parsed.data.threadId);
+        dotId = dotId ?? direct.workspace.requireThread(parsed.data.threadId).dotId;
       } catch {
         return c.json(
           { error: 'Conversation is not owned by this workspace.' },
@@ -177,7 +191,10 @@ export function createApp({
     }
     const task = store.createTask(
       parsed.data.prompt,
-      parsed.data.intervalSeconds,
+      parsed.data.cron ? null : (parsed.data.intervalSeconds ?? null),
+      dotId,
+      parsed.data.cron ?? null,
+      parsed.data.tz ?? null,
     );
     if (platform && parsed.data.threadId)
       platform.workspace.bindTask(task.id, parsed.data.threadId);
@@ -203,7 +220,11 @@ export function createApp({
   });
   app.put('/api/tasks/:id/schedule', async (c) => {
     const parsed = z
-      .object({ intervalSeconds: interval })
+      .object({
+        intervalSeconds: interval.optional(),
+        cron: z.string().optional(),
+        tz: z.string().optional(),
+      })
       .strict()
       .safeParse(await c.req.json().catch(() => null));
     if (!parsed.success)
@@ -211,7 +232,25 @@ export function createApp({
         { error: 'Repeat interval must be 60 seconds to one year, or null.' },
         400,
       );
-    const task = store.schedule(c.req.param('id'), parsed.data.intervalSeconds);
+    if (parsed.data.cron !== undefined) {
+      if (!parseCron(parsed.data.cron))
+        return c.json(
+          { error: 'Use a 5-field cron expression, e.g. "30 9 * * *".' },
+          400,
+        );
+      if (parsed.data.tz && !validTz(parsed.data.tz))
+        return c.json({ error: 'Use a valid IANA time zone name.' }, 400);
+      const task = store.scheduleCron(
+        c.req.param('id'),
+        parsed.data.cron,
+        parsed.data.tz ?? null,
+      );
+      return task ? c.json(task) : c.json({ error: 'Task not found.' }, 404);
+    }
+    const task = store.schedule(
+      c.req.param('id'),
+      parsed.data.intervalSeconds ?? null,
+    );
     return task ? c.json(task) : c.json({ error: 'Task not found.' }, 404);
   });
   app.patch('/api/settings', async (c) => {
