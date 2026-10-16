@@ -174,6 +174,7 @@ See [Setup](docs/SETUP.md) for configuration, Slack, calls, the browser service,
 | Slack                      | Managed Channels SDK declaration with workspace and user allowlists                                                                     |
 | Calls                      | WebRTC speech, delegated compute, bounded sessions, hangup, and timeline receipts                                                       |
 | Background work            | Scheduled server-side turns in their original conversation, with pause and retry controls                                               |
+| **Handoffs and the Dot registry** | Any Dot can hand off work to another Dot via `handoff_to`, creating a task in the target Dot's thread with the source Dot and a note recorded on the prompt. The `GET /api/handoff/registry` endpoint lists every Dot with its capabilities, spaces, and model — owner-token authenticated. |
 | Browser                    | Separate read-only public-page service with page capture and navigation limits                                                          |
 | Dot computers              | Per-Dot browser profiles, files, shell, takeover, permissions, and action records through OpenBot                                       |
 | Memory                     | User-managed preferences that permitted Dots can use                                                                                    |
@@ -193,6 +194,17 @@ This is a single-owner starting point. Shared editing, invitations, file uploads
 - Add event triggers and a persistent responsibility lifecycle.
 - Extend tools and approval flows for your own workflows.
 - Add richer artifacts, connected-app context, and specialist coordination.
+
+## Tools and MCP servers
+
+This project includes a tool registry under `src/server/tools/mcp/` that implements the MCP (Model Context Protocol) client/tool layer. The registry provides tools for reading public pages and performing web searches, enabling Dots to interact with external resources.
+
+### MCP Tools
+
+- **read_public_page**: Reads a provided canonical public HTTP(S) URL in a separate read-only browser, returning source evidence.
+- **search_web**: Searches public web sources and reads relevant excerpts for a research question, returning source URLs for citations.
+
+These tools are integrated into the Dot agent and can be used by Dots to access external information.
 
 ## Contributing
 
