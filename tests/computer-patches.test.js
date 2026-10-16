@@ -5,6 +5,7 @@ import {
   addProjectBindsToDocker,
   addProjectBindsToIndex,
 } from '../deployment/computers/add-project-binds.mjs';
+import { assertLivenessOnlyHealth } from '../deployment/computers/check-supervisor-health.mjs';
 
 const dockerBefore =
   'x\n    Binds: [\n      ...(options.spireSocketVolume\n        ? [`${options.spireSocketVolume}:/tmp/spire-agent/public:ro`]\n        : []),\n    ],\n' +
@@ -56,4 +57,30 @@ it('patches the computer file listing to be breadth-first and skip dependency fo
   expect(() => patchWorkspaceListing(upstream + upstream)).toThrow(
     /Pinned OpenBot source changed/,
   );
+});
+
+it('keeps the public supervisor /health liveness-only, failing the build on drift', () => {
+  const upstream =
+    'app.use("*", async (context, next) => {\n  if (context.req.path === "/health") return next();\n  return next();\n});\n\n' +
+    'app.get("/health", async (context) =>\n  context.json({ status: "ok", docker: await reachable() }),\n);\n';
+  expect(assertLivenessOnlyHealth(upstream)).toBe(upstream);
+  expect(
+    assertLivenessOnlyHealth(upstream.replace(/\n/g, '\r\n')),
+  ).toBeTruthy();
+  const drift = [
+    upstream.replace(
+      'docker: await reachable()',
+      'docker: await reachable(), version',
+    ),
+    upstream.replace('status: "ok"', 'status: "ok", computers: names.length'),
+    upstream + 'app.get("/health/detail", (c) => c.json(config));\n',
+    upstream.replace(
+      'if (context.req.path === "/health")',
+      'if (context.req.path.startsWith("/health"))',
+    ),
+  ];
+  for (const source of drift)
+    expect(() => assertLivenessOnlyHealth(source)).toThrow(
+      /Pinned OpenBot \/health contract changed/,
+    );
 });

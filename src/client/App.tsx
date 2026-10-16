@@ -556,17 +556,15 @@ export function App() {
                 />
                 <span>{item.name}</span>
               </button>
-              {!direct && (
-                <button
-                  className="icon-button dot-settings"
-                  aria-label={`Edit ${item.name} settings`}
-                  onClick={() =>
-                    setDialog({ type: 'dot', dot: item, spaceId: item.spaceId })
-                  }
-                >
-                  <MoreHorizontal size={15} />
-                </button>
-              )}
+              <button
+                className="icon-button dot-settings"
+                aria-label={`Edit ${item.name} settings`}
+                onClick={() =>
+                  setDialog({ type: 'dot', dot: item, spaceId: item.spaceId })
+                }
+              >
+                <MoreHorizontal size={15} />
+              </button>
             </div>
           ))}
         </nav>
@@ -824,20 +822,19 @@ export function App() {
                     />
                     <h2>{dot.name}</h2>
                     <p>{dot.instructions}</p>
-                    {direct ? (
+                    {direct && (
                       <p className="muted dot-model">
                         Model: {dotModelLabel(dot, workspace)}
                       </p>
-                    ) : (
-                      <button
-                        className="text-button"
-                        onClick={() =>
-                          setDialog({ type: 'dot', dot, spaceId: dot.spaceId })
-                        }
-                      >
-                        Edit specialist <MoreHorizontal size={14} />
-                      </button>
                     )}
+                    <button
+                      className="text-button"
+                      onClick={() =>
+                        setDialog({ type: 'dot', dot, spaceId: dot.spaceId })
+                      }
+                    >
+                      Edit specialist <MoreHorizontal size={14} />
+                    </button>
                   </div>
                   {!chatReady && (
                     <div className="setup-card">

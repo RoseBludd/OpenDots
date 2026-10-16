@@ -19,20 +19,41 @@ export interface ImportOptions {
   maxRules?: number;
   maxBytes?: number;
   apply?: boolean;
+  /**
+   * Opt-in: on apply, set an empty `desk` field on each matched Dot to its seat
+   * name. A Dot with a desk then calls the model only with CADIS_API_KEY_<DESK>
+   * (WO-03), failing until that key exists.
+   */
+  setDesk?: boolean;
+}
+export interface DeskReport {
+  desk: string;
+  dotId: string | null;
+  dotName: string | null;
+  /** How the Dot was matched: its desk field or its name. */
+  matchedBy: 'desk' | 'name';
+  new: number;
+  skippedDuplicate: number;
+  truncated: number;
+  /** --set-desk outcome: the desk that was (or, in a dry run, would be) set. */
+  setDesk: string | null;
 }
 export interface ImportReport {
   apply: boolean;
-  globals: { added: number; skipped: number };
-  desks: {
-    desk: string;
-    dotId: string | null;
-    added: number;
-    skipped: number;
-    truncated: number;
-  }[];
+  globals: { new: number; skippedDuplicate: number };
+  desks: DeskReport[];
   unmatchedDesks: string[];
   /** Global memories that are not standing rules; reported, never changed. */
   otherGlobals: number;
+}
+
+/** Content key for dedupe: list marker stripped, whitespace collapsed, case folded. */
+export function normalizeMemory(text: string): string {
+  return text
+    .trim()
+    .replace(/^(?:\d+[.)]|[-*])\s+/, '')
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
 }
 
 /** Split markdown into sections at headings; drop empty sections. */
@@ -72,13 +93,25 @@ export function rules(markdown: string): string[] {
   return out.filter(Boolean);
 }
 
-/** A desk maps to the Dot whose desk field (WO-03) or name matches it. */
-export function dotForDesk(dots: Dot[], desk: string): Dot | undefined {
+/**
+ * Seat folder -> Dot: the Dot's desk field first, then its name. Host Dots are
+ * named like 'oppi. (desk)' or 'oppi.'; the trailing dot and the ' (desk)'
+ * suffix are optional and matching is case-insensitive.
+ */
+export function dotForDesk(
+  dots: Dot[],
+  desk: string,
+): { dot: Dot; matchedBy: 'desk' | 'name' } | undefined {
   const key = desk.toLowerCase();
-  return (
-    dots.find((dot) => dot.desk === key) ??
-    dots.find((dot) => dot.name.toLowerCase().replace(/\.+$/, '') === key)
-  );
+  const byDesk = dots.find((dot) => dot.desk?.toLowerCase() === key);
+  if (byDesk) return { dot: byDesk, matchedBy: 'desk' };
+  const byName = dots.find((dot) => {
+    const match = dot.name
+      .trim()
+      .match(/^([a-z0-9][a-z0-9-]*)\.?(?:\s*\(desk\))?$/i);
+    return match?.[1].toLowerCase() === key;
+  });
+  return byName ? { dot: byName, matchedBy: 'name' } : undefined;
 }
 
 function seatFiles(seatsDir: string, desk: string): string[] {
@@ -106,34 +139,42 @@ export function importSeatMemories(
   const maxRules = options.maxRules ?? 40;
   const maxBytes = options.maxBytes ?? 1500;
   const scopes = workspace.memoryScopes;
-  const existing = () => scopes.annotate(store.memories());
-  const has = (text: string, dotId: string | null) =>
-    existing().some((memory) => memory.text === text && memory.dotId === dotId);
-  const save = (text: string, dotId: string | null) => {
-    if (!apply) return;
-    const memory = store.saveMemory(text);
-    scopes.set(memory.id, dotId);
+  // Normalized content already present per scope ('' = global); grows as we add,
+  // so duplicates inside one import are skipped too.
+  const seen = new Map<string, Set<string>>();
+  for (const memory of scopes.annotate(store.memories())) {
+    const key = memory.dotId ?? '';
+    if (!seen.has(key)) seen.set(key, new Set());
+    seen.get(key)!.add(normalizeMemory(memory.text));
+  }
+  const existingGlobals = [...(seen.get('') ?? [])];
+  const claim = (text: string, dotId: string | null) => {
+    const key = dotId ?? '';
+    const set = seen.get(key) ?? new Set<string>();
+    seen.set(key, set);
+    const normalized = normalizeMemory(text);
+    if (set.has(normalized)) return false;
+    set.add(normalized);
+    if (apply) scopes.set(store.saveMemory(text).id, dotId);
+    return true;
   };
   const report: ImportReport = {
     apply,
-    globals: { added: 0, skipped: 0 },
+    globals: { new: 0, skippedDuplicate: 0 },
     desks: [],
     unmatchedDesks: [],
     otherGlobals: 0,
   };
-  const ruleTexts: string[] = [];
+  const ruleKeys = new Set<string>();
   if (options.rulesFile && existsSync(options.rulesFile)) {
     for (const rule of rules(readFileSync(options.rulesFile, 'utf8')).slice(
       0,
       maxRules,
     )) {
       const text = boundedText(rule, maxBytes);
-      ruleTexts.push(text);
-      if (has(text, null)) report.globals.skipped++;
-      else {
-        save(text, null);
-        report.globals.added++;
-      }
+      ruleKeys.add(normalizeMemory(text));
+      if (claim(text, null)) report.globals.new++;
+      else report.globals.skippedDuplicate++;
     }
   }
   if (options.seatsDir && existsSync(options.seatsDir)) {
@@ -141,29 +182,40 @@ export function importSeatMemories(
     for (const entry of readdirSync(options.seatsDir).sort()) {
       const desk = basename(entry, '.md').toLowerCase();
       if (!/^[a-z0-9][a-z0-9-]{0,31}$/.test(desk)) continue;
-      const dot = dotForDesk(dots, desk);
-      if (!dot) {
+      const match = dotForDesk(dots, desk);
+      if (!match) {
         report.unmatchedDesks.push(desk);
         continue;
       }
-      const row = { desk, dotId: dot.id, added: 0, skipped: 0, truncated: 0 };
+      const { dot, matchedBy } = match;
+      const row: DeskReport = {
+        desk,
+        dotId: dot.id,
+        dotName: dot.name,
+        matchedBy,
+        new: 0,
+        skippedDuplicate: 0,
+        truncated: 0,
+        setDesk: null,
+      };
+      if (options.setDesk && !dot.desk) {
+        row.setDesk = desk;
+        if (apply) workspace.setDotModel(dot.id, { desk });
+      }
       const items = seatFiles(options.seatsDir, entry).flatMap((file) =>
         sections(readFileSync(file, 'utf8')),
       );
       for (const item of items.slice(0, maxPerDesk)) {
         const text = boundedText(item, maxBytes);
         if (text !== item) row.truncated++;
-        if (has(text, dot.id)) row.skipped++;
-        else {
-          save(text, dot.id);
-          row.added++;
-        }
+        if (claim(text, dot.id)) row.new++;
+        else row.skippedDuplicate++;
       }
       report.desks.push(row);
     }
   }
-  report.otherGlobals = existing().filter(
-    (memory) => memory.dotId === null && !ruleTexts.includes(memory.text),
+  report.otherGlobals = existingGlobals.filter(
+    (key) => !ruleKeys.has(key),
   ).length;
   return report;
 }
