@@ -194,6 +194,17 @@ This is a single-owner starting point. Shared editing, invitations, file uploads
 - Extend tools and approval flows for your own workflows.
 - Add richer artifacts, connected-app context, and specialist coordination.
 
+## Tools and MCP servers
+
+This project includes a tool registry under `src/server/tools/mcp/` that implements the MCP (Model Context Protocol) client/tool layer. The registry provides tools for reading public pages and performing web searches, enabling Dots to interact with external resources.
+
+### MCP Tools
+
+- **read_public_page**: Reads a provided canonical public HTTP(S) URL in a separate read-only browser, returning source evidence.
+- **search_web**: Searches public web sources and reads relevant excerpts for a research question, returning source URLs for citations.
+
+These tools are integrated into the Dot agent and can be used by Dots to access external information.
+
 ## Contributing
 
 See [Contributing](CONTRIBUTING.md) for development guidance and [Security](SECURITY.md) for reporting issues. Contributions should describe the workflow they enable, include verification evidence, and distinguish live integrations from fixtures.

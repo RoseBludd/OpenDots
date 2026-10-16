@@ -3,6 +3,7 @@ import { pageReviewTool } from '../shared/page-review.js';
 import { ComputerService } from './computer-service.js';
 import { computerTools } from './computer-tools.js';
 import { pageAccess, pageTools } from './page-tools.js';
+import { mcpTools } from './tools/mcp/index.js';
 import { AbstractAgent } from '@ag-ui/client';
 import { type BaseEvent, type RunAgentInput, EventType } from '@ag-ui/core';
 import {
@@ -283,6 +284,7 @@ export class DotAgent extends AbstractAgent {
         });
         const serverTools = [
           ...tools,
+          ...mcpTools,
           ...pageTools(pages),
           ...(computer.configured
             ? computerTools(computer, dot.id, check, controller.signal)
