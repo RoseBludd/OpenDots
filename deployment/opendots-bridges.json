@@ -4,6 +4,9 @@
     {
       "name": "emailzs",
       "url": "https://127.0.0.1:3101/mcp",
+      "headers": {
+        "x-tenant-api-key": "$EMAILZS_TENANT_API_KEY"
+      },
       "allow": [
         "list_*",
         "get_*",
@@ -23,6 +26,9 @@
     {
       "name": "callerzs",
       "url": "https://127.0.0.1:3102/mcp",
+      "headers": {
+        "x-tenant-api-key": "$CALLERZS_TENANT_API_KEY"
+      },
       "allow": [
         "list_*",
         "get_*",

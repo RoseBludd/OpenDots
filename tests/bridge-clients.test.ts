@@ -16,6 +16,7 @@ import {
   loadBridgesConfig,
   matchesPattern,
   resetBridgeClients,
+  resolveBridgeHeaders,
   type BridgeConfig,
 } from '../src/server/bridge-clients.js';
 
@@ -127,6 +128,23 @@ describe('loadBridgesConfig', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('resolveBridgeHeaders', () => {
+  it('resolves $-env refs at call time and omits unset vars', () => {
+    const configured: BridgeConfig = {
+      ...bridge,
+      headers: { 'x-tenant-api-key': '$WO04_TEST_TENANT_KEY', 'x-static': 'plain' },
+    };
+    delete (process.env as Record<string, string | undefined>)['WO04_TEST_TENANT_KEY'];
+    expect(resolveBridgeHeaders(configured)).toEqual({ 'x-static': 'plain' });
+    process.env['WO04_TEST_TENANT_KEY'] = 'test-value-only';
+    expect(resolveBridgeHeaders(configured)).toEqual({
+      'x-tenant-api-key': 'test-value-only',
+      'x-static': 'plain',
+    });
+    delete (process.env as Record<string, string | undefined>)['WO04_TEST_TENANT_KEY'];
   });
 });
 

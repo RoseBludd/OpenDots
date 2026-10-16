@@ -17,7 +17,19 @@ export const bridgeConfigSchema = z.object({
   /** Tool name patterns; a trailing "*" matches by prefix. Anything not matched is refused (fail-closed). */
   allow: z.array(z.string()).min(1),
   deny: z.array(z.string()).default([]),
+  /** Request headers: header name -> env var NAME holding the value ("$"-prefixed). The secret itself is never in the config file; unset vars simply omit the header. */
+  headers: z.record(z.string(), z.string()).optional(),
 });
+
+/** Resolves configured headers from the environment at call time; unset env vars omit their header. */
+export function resolveBridgeHeaders(bridge: BridgeConfig): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [header, ref] of Object.entries(bridge.headers ?? {})) {
+    const value = ref.startsWith('$') ? process.env[ref.slice(1)] : ref;
+    if (value) out[header] = value;
+  }
+  return out;
+}
 export const bridgesConfigSchema = z.object({
   bridges: z.array(bridgeConfigSchema).min(1),
 });
@@ -106,6 +118,7 @@ export async function callBridgeTool(
   const client = new Client({ name: 'opendots', version: '0.1.0' });
   const boundedSignal = AbortSignal.any([signal, AbortSignal.timeout(CALL_TIMEOUT_MS)]);
   const transport = new StreamableHTTPClientTransport(new URL(bridge.url), {
+    requestInit: { headers: resolveBridgeHeaders(bridge) },
     fetch: (url, init) =>
       fetch(url, {
         ...init,
@@ -128,7 +141,9 @@ export async function callBridgeTool(
 /** Lists a bridge's tools as the client sees them: only allowlisted tools are returned. */
 export async function listBridgeTools(bridge: BridgeConfig): Promise<string[]> {
   const client = new Client({ name: 'opendots', version: '0.1.0' });
-  const transport = new StreamableHTTPClientTransport(new URL(bridge.url));
+  const transport = new StreamableHTTPClientTransport(new URL(bridge.url), {
+    requestInit: { headers: resolveBridgeHeaders(bridge) },
+  });
   try {
     await client.connect(transport);
     const { tools } = await client.listTools();
@@ -202,7 +217,9 @@ export async function bridgeTools(
   for (const bridge of config.bridges) {
     try {
       const client = new Client({ name: 'opendots', version: '0.1.0' });
-      const transport = new StreamableHTTPClientTransport(new URL(bridge.url));
+      const transport = new StreamableHTTPClientTransport(new URL(bridge.url), {
+        requestInit: { headers: resolveBridgeHeaders(bridge) },
+      });
       try {
         await client.connect(transport);
         const { tools } = await client.listTools();
