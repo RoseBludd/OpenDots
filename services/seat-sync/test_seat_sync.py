@@ -144,16 +144,27 @@ class Test(unittest.TestCase):
             self.assertEqual(f.read(), 'remote-v2-by-trill', 'owner side wins after conflict record')
         self.assertTrue(any(l.startswith('CONFLICT handoff/seats/trilldesk/notes.md') for l in self.logs))
 
-        # --- run 3: owner-side conflict: both sides change on a host-owned desk.
+        # --- run 3: owner-side conflict: both sides change on a host-owned desk
+        # (desk file AND desk progress file; exactly one record each).
         with open(self.path('seats/hostdesk/local1.md'), 'w') as f:
             f.write('host-edit-locally')
         self.r2.put('handoff/seats/hostdesk/local1.md', b'remote-tamper', ts=time.time())
+        with open(self.path('progress/hostdesk.md'), 'w') as f:
+            f.write('host-progress-v1')
+        self.run_sync()  # new progress file pushed once so both sides have state
+        self.assertEqual(self.r2.objects['handoff/progress/hostdesk.md'][0], b'host-progress-v1')
+        with open(self.path('progress/hostdesk.md'), 'w') as f:
+            f.write('host-progress-edit')
+        self.r2.put('handoff/progress/hostdesk.md', b'remote-progress-tamper', ts=time.time())
         self.run_sync()
         conflicts = [k for k in self.r2.objects if k.startswith(CONFLICT_PREFIX + 'hostdesk/')]
-        self.assertEqual(len(conflicts), 1)
+        self.assertEqual(len(conflicts), 2)
+        self.assertEqual([json.loads(self.r2.objects[k][0])['key'] for k in sorted(conflicts)],
+                         ['handoff/progress/hostdesk.md', 'handoff/seats/hostdesk/local1.md'])
         with open(self.path('seats/hostdesk/local1.md')) as f:
             self.assertEqual(f.read(), 'host-edit-locally', 'host owner wins on its own desk')
         self.assertEqual(self.r2.objects['handoff/seats/hostdesk/local1.md'][0], b'host-edit-locally')
+        self.assertEqual(self.r2.objects['handoff/progress/hostdesk.md'][0], b'host-progress-edit')
 
         # --- run 4: dry-run writes nothing; skip list hides a desk.
         with open(self.path('seats/hostdesk/local1.md'), 'w') as f:

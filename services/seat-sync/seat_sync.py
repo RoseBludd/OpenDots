@@ -176,7 +176,7 @@ class SeatSync:
 
     # --- sync passes ------------------------------------------------------------
 
-    def pull_pass(self, remote, initial, state, metrics):
+    def pull_pass(self, remote, initial, state, metrics, resolved):
         """Non-owner desks (all desks with --initial) + progress + shared files are pull-only."""
         need_pull, new_state = [], {}
         for key, remote_now in sorted(remote.items()):
@@ -201,6 +201,7 @@ class SeatSync:
                 if winner == 'remote':
                     need_pull.append((key, remote_now))
                 else:
+                    resolved.add(key)  # push pass must not record this conflict again
                     new_state[key] = {'local': lnow, 'remote': st['remote']}
                 continue
             if lnow is None or lnow[0] != remote_now[0] or lnow[1] < remote_now[1] - 2:
@@ -229,7 +230,7 @@ class SeatSync:
         with ThreadPoolExecutor(8) as ex:
             return sum(ex.map(one, need_pull))
 
-    def push_pass(self, remote, state, metrics):
+    def push_pass(self, remote, state, metrics, resolved):
         """Host-owned desks are pushed; everything else is pull-only (never pushed)."""
         new_state = {}
         for desk in sorted(os.listdir(os.path.join(self.root, 'seats'))) \
@@ -252,7 +253,7 @@ class SeatSync:
                 remote_changed = st is not None and st['remote'] is not None and \
                     (remote_now is None or remote_now != st['remote'])
                 if st is None or local_changed:
-                    if local_changed and remote_changed:
+                    if local_changed and remote_changed and key not in resolved:
                         metrics['conflicts'] += 1
                         if not self.dry_run:
                             ck = self.write_conflict(key, p, remote_now)
@@ -267,7 +268,7 @@ class SeatSync:
                     self.s3.upload_file(p, self.bucket, key)
                     new_state[key] = {'local': lnow, 'remote': lnow}
                     metrics['pushed'] += 1
-                elif remote_changed:
+                elif remote_changed and key not in resolved:
                     self.log(f'WARN remote drift on host-owned {key} remote={remote_now} (local wins, not overwritten)')
                 if not self.dry_run and st is not None:
                     new_state.setdefault(key, st)
@@ -301,9 +302,10 @@ class SeatSync:
             remote.pop(k, None)
 
         merged = dict(state)
-        merged.update(self.pull_pass(remote, initial, state, metrics))
+        resolved = set()
+        merged.update(self.pull_pass(remote, initial, state, metrics, resolved))
         if not initial:
-            merged.update(self.push_pass(remote, state, metrics))
+            merged.update(self.push_pass(remote, state, metrics, resolved))
 
         if not self.dry_run:
             os.makedirs(os.path.dirname(self.state_path), exist_ok=True)
