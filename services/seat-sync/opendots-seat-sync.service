@@ -1,0 +1,18 @@
+[Unit]
+Description=opendots seat-sync (R2 ledger/seat-folder sync, WO-TWIN-05)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Secrets stay in the env file (mode 600), never in argv, never printed.
+ExecStart=/usr/bin/env python3 /root/bin/opendots-seat-sync.py --loop 900
+Environment=SEAT_SYNC_ENV_FILE=/opt/agent-twins/.env
+Environment=SEAT_SYNC_ROOT=/mnt/genius_vol_2/opendots/handoff
+Nice=10
+IOSchedulingClass=idle
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
