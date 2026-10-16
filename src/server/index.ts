@@ -1,4 +1,5 @@
 import { webSearchProvider } from './parallel.js';
+import { primeBridgeTools } from './bridge-clients.js';
 import { createShutdown } from './shutdown.js';
 import { reportChannelFailure, safeFailure } from './slack-channel.js';
 import { serve } from '@hono/node-server';
@@ -20,6 +21,7 @@ import {
   directModeEnabled,
   directModelConfig,
 } from './direct-model/index.js';
+import { HandoffService } from './handoff/index.js';
 
 const host = process.env.HOST ?? '127.0.0.1';
 const port = Number(process.env.PORT ?? 4310);
@@ -150,6 +152,8 @@ const runner = new Runner(
   },
 );
 
+const handoff = new HandoffService(store, workspace);
+
 const wsOrigin = new URL(
   config.intelligenceWsUrl ?? 'wss://realtime.intelligence.copilotkit.ai',
 ).origin;
@@ -160,15 +164,13 @@ const app = createApp({
   config: researchConfig,
   ownerToken,
   origin:
-    process.env.APP_ORIGIN ??
-    (process.env.NODE_ENV === 'development'
-      ? 'http://127.0.0.1:5173'
-      : undefined),
+    process.env.APP_ORIGIN ?? (process.env.NODE_ENV === 'development' ? 'http://127.0.0.1:5173' : undefined),
   platform,
   direct,
   auth,
   familyMode,
   workspace,
+  handoff,
 });
 if (familyStore && auth)
   app.route(
@@ -203,6 +205,7 @@ const server = serve({ fetch: app.fetch, hostname: host, port }, (info) => {
       : `OpenDots template listening on http://${host}:${info.port}`,
   );
   runner.start();
+  primeBridgeTools();
   if (platform)
     void platform
       .start()
