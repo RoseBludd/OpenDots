@@ -327,7 +327,12 @@ export class Store {
       if (this.owns(claim)) this.invalidate(claim, 'queued', reason);
     });
   }
-  fail(claim: Claim, error: string, now = Date.now()) {
+  fail(
+    claim: Claim,
+    error: string,
+    now = Date.now(),
+    retryable = true,
+  ) {
     this.transaction(() => {
       if (!this.owns(claim)) return;
       const task = this.task(claim.id)!;
@@ -341,7 +346,7 @@ export class Store {
       // scripts/hermes-wo-tracker.sh -> wo-escalation-queue.sh: retry with a
       // growing cooldown until the budget is spent, then escalate once.
       const attempts = task.attempts ?? 0;
-      if (attempts < limit) {
+      if (retryable && attempts < limit) {
         const backoffMinutes = Math.min(attempts, 5);
         this.db
           .prepare(

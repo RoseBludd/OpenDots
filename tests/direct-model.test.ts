@@ -423,7 +423,9 @@ describe('direct-model mode', () => {
     );
     store.createTask('A slow task');
     await runner.tick();
-    expect(store.tasks()[0].status).toBe('failed');
+    // WO-TWIN-C: budget overruns are retryable run failures in the ported
+    // work-order flow — the task re-queues with the clean error retained.
+    expect(store.tasks()[0].status).toBe('queued');
     expect(store.tasks()[0].error).toMatch(/took longer than/);
   });
 

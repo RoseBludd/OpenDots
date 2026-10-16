@@ -96,9 +96,13 @@ export class Runner {
       controller.signal.throwIfAborted();
       this.store.finish(claim, result);
     } catch (error) {
+      // Explicit aborts (timeouts, stops, revoked permission) fail the task
+      // outright; only unexpected run failures enter the retry/escalate flow.
       this.store.fail(
         claim,
         error instanceof Error ? error.message : 'Unexpected research failure.',
+        undefined,
+        !controller.signal.aborted,
       );
     } finally {
       clearInterval(ownershipCheck);
