@@ -68,7 +68,7 @@ function ipToLong(ip: string): number | null {
 // (tailscale-only deployment); the bearer token remains valid and still gates
 // any source that somehow presents a non-tailnet forwarded address.
 function trustedTailnetSource(forwarded: string | undefined): boolean {
-  if (!forwarded) return true;
+  if (!forwarded) return false; // direct edge access keeps the bearer gate
   return forwarded.split(',').every((raw) => {
     let ip = raw.trim().toLowerCase();
     if (ip.startsWith('::ffff:')) ip = ip.slice(7);
