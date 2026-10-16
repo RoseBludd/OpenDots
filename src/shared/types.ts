@@ -11,6 +11,14 @@ export interface Task {
   prompt: string;
   status: Status;
   intervalSeconds: number | null;
+  /** Owning Dot; null or absent = global bucket (all such tasks serialize). */
+  dotId?: string | null;
+  /** 5-field cron schedule (see server/cron.ts); null = interval or one-off. */
+  cron?: string | null;
+  /** IANA time zone for `cron`; server default is America/Chicago. */
+  tz?: string | null;
+  /** Work-order attempts since last success (retry budget before escalation). */
+  attempts?: number;
   nextRunAt: number | null;
   createdAt: number;
   updatedAt: number;

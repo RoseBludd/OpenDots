@@ -5,6 +5,9 @@ import { research, type Config } from './research.js';
 export class Runner {
   private timer?: ReturnType<typeof setInterval>;
   private active = new Map<string, AbortController>();
+  private pumping = false;
+  /** Concurrent task slots (DOT_WORKERS); one task per Dot is enforced by the store. */
+  private workers: number;
   constructor(
     private store: Store,
     private config: Config,
@@ -14,7 +17,9 @@ export class Runner {
       signal: AbortSignal,
       progress: (text: string) => void,
     ) => Promise<Result>,
-  ) {}
+  ) {
+    this.workers = Math.max(1, Number(process.env.DOT_WORKERS) || 3);
+  }
   start() {
     if (!this.timer) {
       this.timer = setInterval(() => void this.tick(), 1000);
@@ -40,10 +45,23 @@ export class Runner {
     for (const controller of this.active.values())
       controller.abort(new Error('Run stopped because settings changed.'));
   }
+  /** Claims and starts every task that fits in the worker pool. */
   async tick() {
-    if (this.active.size) return;
-    const claim = this.store.claim();
-    if (!claim) return;
+    if (this.pumping) return;
+    this.pumping = true;
+    try {
+      const runs: Promise<void>[] = [];
+      while (this.active.size < this.workers) {
+        const claim = this.store.claim();
+        if (!claim) break;
+        runs.push(this.run(claim));
+      }
+      await Promise.all(runs);
+    } finally {
+      this.pumping = false;
+    }
+  }
+  private async run(claim: Claim) {
     const controller = new AbortController();
     this.active.set(claim.id, controller);
     const ownershipCheck = setInterval(() => {
