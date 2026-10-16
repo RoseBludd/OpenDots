@@ -59,7 +59,10 @@ function makeServer(addr) {
   server.on('clientError', (_e, s) => s.destroy());
   server.on('connection', (s) => {
     const src = normIp(s.remoteAddress);
-    if (!allowed(src)) s.destroy(); // refuse before parsing anything
+    if (!allowed(src)) {
+      console.log(JSON.stringify({ t: new Date().toISOString(), deny: src, stage: 'connection' }));
+      s.destroy(); // refuse before parsing anything
+    }
   });
   server.on('error', (e) => {
     if (String(e).includes('EADDRNOTAVAIL') && addr === TAILNET_IP) {

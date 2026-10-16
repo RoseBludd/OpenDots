@@ -14,4 +14,5 @@ M=/mnt/genius_vol_2/opendots/desk-map.tsv; H=/mnt/genius_vol_2/opendots/handoff/
   id=${c#odhost-computer-}; d=$(awk -F'\t' -v i="$id" '$1==i{print $2}' $M)
   [ -n "$d" ] && [ "$(head -c 5 $H/$d/OWNER 2>/dev/null)" != "host" ] && docker stop -t 20 $c >/dev/null && echo "$(date -Is) cap-guard stopped $c ($d is not host-owned)"
 done
+echo "$(date -Is) ok running=${#RUN[@]} max=$MAX" # heartbeat so the health script can see liveness
 exit 0

@@ -51,10 +51,21 @@ Reuses (existing components):
 ## Health (`health.sh`)
 
 - app: `GET /api/state` with bearer via curl config file → expect 200.
-- supervisor: `docker inspect .State.Health.Status` → expect `healthy`.
-- cap-guard: `/var/log/opendots-cap-guard.log` mtime within the last 5 minutes and a
-  recent `cap-guard` run keeping odhost computers at 0.5 CPU / 1G.
+- supervisor: liveness-only `/health` probe via `docker exec` (per the WO-09 pattern) → expect 200/`healthy`.
+- cap-guard: `/var/log/opendots-cap-guard.log` mtime within the last 5 minutes (cap-guard
+  writes a per-minute heartbeat line) and a count of running odhost computers.
+- tailnet-guard: container healthcheck (self-fetch).
 - Prints one `HEALTH` line per check, exits non-zero if any check fails.
+
+## Host constraints worth knowing
+
+- The `opendots-supervisor:b6932d3-dot-auth` image currently fails containerd layer
+  extraction on this host (missing snapshot dir `28753`), so **the supervisor container
+  must not be recreated** — `deploy.sh` therefore only converges `app` + `tailnet-guard`
+  with `--no-deps` and the supervisor keeps running untouched. If the image is
+  re-transferred/reloaded later, `docker compose up -d` for it can be run manually.
+- `cap-guard.sh` appends a per-minute heartbeat so health.sh can verify liveness even when
+  there is nothing to enforce.
 
 ## Run
 

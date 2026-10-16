@@ -71,6 +71,8 @@ services:
     networks: [computer-control]
     init: true
     restart: unless-stopped
+    # supervisor liveness is probed by health.sh via `docker exec ... /health` (liveness-only,
+    # per WO-09); no compose-level healthcheck so the running container is never recreated.
     cpus: 0.25
     mem_limit: 256m
     security_opt: ['no-new-privileges:true']

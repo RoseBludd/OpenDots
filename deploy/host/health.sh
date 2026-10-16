@@ -11,9 +11,9 @@ rm -f "$C"
 if [ "$CODE" = 200 ]; then S=ok; else S=fail; FAIL=1; fi
 echo "HEALTH app-api-state http=$CODE status=$S"
 rm -f /tmp/od-health-state.json
-SUP=$(docker inspect -f '{{.State.Health.Status}}' opendots-host-computer-supervisor-1 2>/dev/null)
+SUP=$(docker exec opendots-host-computer-supervisor-1 node -e "fetch('http://127.0.0.1:4300/health').then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))" 2>/dev/null && echo healthy || echo fail)
 [ "$SUP" = healthy ] || FAIL=1
-echo "HEALTH supervisor status=$SUP"
+echo "HEALTH supervisor status=$SUP (liveness-only /health exec probe)"
 if [ -f /var/log/opendots-cap-guard.log ]; then
   AGE=$(( $(date +%s) - $(stat -c %Y /var/log/opendots-cap-guard.log) ))
   if [ $AGE -le 300 ]; then CG=ok; else CG=stale; FAIL=1; fi

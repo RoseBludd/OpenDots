@@ -17,8 +17,11 @@ install -m 700 $D/health.sh /root/bin/opendots-health.sh
 install -m 700 $D/cap-guard.sh /root/bin/opendots-cap-guard.sh
 install -m 700 $D/seat-sync.py /root/bin/opendots-seat-sync.py
 chmod 600 $OD/.env
-# 2. converge containers (recreates only services whose config changed)
-cd $OD && $W 300 docker compose -f compose.host.yml --env-file .env up -d 2>&1 | tail -5
+# 2. converge containers. Only app + tailnet-guard are targeted with --no-deps: the
+# supervisor must never be stopped/recreated by routine deploys (its image layer has a
+# containerd snapshot defect on this host: extract of sha256:a52d00c1... fails with
+# "snapshots/28753/fs: no such file or directory"; the running container is healthy).
+cd $OD && $W 300 docker compose -f compose.host.yml --env-file .env up -d --no-deps app tailnet-guard 2>&1 | tail -5
 # 3. cron: cap-guard every minute, seat sync 4x/h, backup nightly 03:23, health every 15 min
 ( crontab -l 2>/dev/null | rg -v 'opendots-cap-guard|opendots-seat-sync|opendots-backup-r2|opendots-health'
   echo "* * * * * /root/bin/opendots-cap-guard.sh >> /var/log/opendots-cap-guard.log 2>&1  # oppi 2026-10-16"
