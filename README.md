@@ -174,6 +174,7 @@ See [Setup](docs/SETUP.md) for configuration, Slack, calls, the browser service,
 | Slack                      | Managed Channels SDK declaration with workspace and user allowlists                                                                     |
 | Calls                      | WebRTC speech, delegated compute, bounded sessions, hangup, and timeline receipts                                                       |
 | Background work            | Scheduled server-side turns in their original conversation, with pause and retry controls                                               |
+| **Handoffs and the Dot registry** | Any Dot can hand off work to another Dot via `handoff_to`, creating a task in the target Dot's thread with the source Dot and a note recorded on the prompt. The `GET /api/handoff/registry` endpoint lists every Dot with its capabilities, spaces, and model — owner-token authenticated. |
 | Browser                    | Separate read-only public-page service with page capture and navigation limits                                                          |
 | Dot computers              | Per-Dot browser profiles, files, shell, takeover, permissions, and action records through OpenBot                                       |
 | Memory                     | User-managed preferences that permitted Dots can use                                                                                    |
@@ -247,3 +248,14 @@ A memory is either global (visible to every Dot) or belongs to one Dot. Existing
 - `GET /api/memories?dotId=<id>` returns what that Dot can see; without `dotId` it returns every memory with its `dotId` (null = global).
 - `POST /api/memories` and `PUT /api/memories/:id` accept an optional `dotId` (null makes a memory global).
 - Seat import (dry run unless `--apply`; existing memories are never deleted or rescoped): `node --import tsx src/server/memory-scope/import-cli.ts --seats <seats dir> --rules <standing-rules.md> [--max 20] [--max-bytes 1500] [--apply]`. Each rule becomes a global memory. Each `seats/<desk>/` (BRIEF.md first, then other `.md` files) or `seats/<desk>.md` becomes up to `--max` memories for the Dot whose desk or name matches. The built server ships the same script as `dist/server/server/memory-scope/import-cli.js`.
+
+## Concurrency and schedules
+
+The background task runner (`src/server/runner.ts`) is a pool of `DOT_WORKERS` concurrent workers (default 3, minimum 1). The scheduler (`src/server/store.ts`) claims the oldest due task first, but never starts a second task for the same Dot while one is running: tasks run in parallel across Dots and serialize within a Dot. Tasks without a Dot share one global bucket that also serializes. Leases are unchanged: a claimed task holds a lease for `max(180 s, TASK_TIMEOUT_MS + 30 s)` and expired leases are re-queued safely.
+
+Schedules come in two interchangeable kinds, set via `PUT /api/tasks/:id/schedule`:
+
+- **Interval** (existing): `{"intervalSeconds": 3600}` (60 s to one year) re-runs the task that long after each successful run.
+- **Cron time-of-day**: `{"cron": "30 9 * * *", "tz": "America/Chicago"}` uses a 5-field cron expression with an IANA time zone (default `America/Chicago`). The next fire is computed after each successful run; the first fire is scheduled when the task is created. Cron parsing and next-run computation (`src/server/cron.ts`) are ported from RoseBludd/hermes `vendor/hermes-agent/cron/jobs.py`, using the cron-parser library, the TypeScript equivalent of Hermes' Python croniter, so DST transitions skip wall-clock minutes that do not exist. `POST /api/tasks` also accepts optional `dotId` (default: the Dot owning the bound conversation) and `cron`/`tz`.
+
+Failed tasks follow a work-order claim/retry/escalate flow ported from RoseBludd/hermes (`scripts/hermes-wo-tracker.sh` → `wo-escalation-queue.sh`): a failed task is re-queued with a growing cooldown (one minute per prior attempt) until `DOT_TASK_RETRIES` attempts (default 3) are spent, then escalated once — it stops retrying, keeps its error, and logs a `Work order escalated` event for a human to pick up. Re-queuing a task manually resets the retry budget. Environment knobs: `DOT_WORKERS`, `DOT_TASK_RETRIES`, `TASK_TIMEOUT_MS`, `DOT_RUN_BUDGET_MS`.
