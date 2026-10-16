@@ -50,7 +50,7 @@ function bearerAuthorized(
   return (
     expected.length === supplied.length && timingSafeEqual(expected, supplied)
   );
-}}
+}
 function ipToLong(ip: string): number | null {
   const parts = ip.split('.');
   if (parts.length !== 4) return null;
