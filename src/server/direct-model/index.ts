@@ -143,7 +143,9 @@ export class DirectModel {
     const settings = this.store.settings();
     const dot = this.workspace.dot(dotId);
     return settings.memoryAllowed && dot?.memoryAllowed
-      ? this.store.memories().map((memory) => memory.text)
+      ? this.workspace.memoryScopes
+          .visible(this.store.memories(), dotId)
+          .map((memory) => memory.text)
       : [];
   }
 
@@ -223,6 +225,8 @@ export class DirectModel {
       const { text } = await this.turn(threadId, claim.prompt, { signal });
       return { text, sources: [], sample: false };
     }
+    // No Dot here: only global memories (WO-02).
+    memories = this.workspace.memoryScopes.visible(memories, null);
     const web = this.options.research;
     if (
       web &&

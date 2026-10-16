@@ -1,4 +1,5 @@
 import { ComputerStore } from './computer-store.js';
+import { MemoryScopeStore } from './memory-scope/store.js';
 import { Pages } from './pages.js';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
@@ -10,6 +11,8 @@ export class WorkspaceStore {
   private db: DatabaseSync;
   readonly pages: Pages;
   readonly computers: ComputerStore;
+  /** Per-Dot memory scope (WO-02). */
+  readonly memoryScopes: MemoryScopeStore;
   constructor(
     path: string,
     readonly ownerId: string,
@@ -54,6 +57,7 @@ export class WorkspaceStore {
         COMMIT;`);
     }
     this.computers = new ComputerStore(this.db);
+    this.memoryScopes = new MemoryScopeStore(this.db);
     this.pages = new Pages(this.db, (id) =>
       this.spaces().some((space) => space.id === id),
     );
