@@ -49,6 +49,8 @@ export interface Memory {
   id: string;
   text: string;
   createdAt: number;
+  /** Owning Dot; null or absent = global (visible to every Dot). */
+  dotId?: string | null;
 }
 export interface Detail {
   task: Task;

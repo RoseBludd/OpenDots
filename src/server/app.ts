@@ -51,6 +51,9 @@ export function createApp({
   familyMode = false,
 }: AppOptions) {
   const direct = platform ? undefined : directOption;
+  // Per-Dot memory scope (WO-02) lives with the Dots; absent in sample mode.
+  const workspace = platform?.workspace ?? direct?.workspace;
+  const dotIdField = z.string().min(1).max(200).nullable().optional();
   const app = new Hono();
   if (auth) app.route('/api/auth', authRoutes(auth, origin));
   app.use(
@@ -109,7 +112,9 @@ export function createApp({
     c.json({
       settings: store.settings(),
       tasks: store.tasks(),
-      memories: store.memories(),
+      memories: workspace
+        ? workspace.memoryScopes.annotate(store.memories())
+        : store.memories(),
       mode: direct ? direct.mode : config.mode,
       configured: direct ? true : configured(config),
     }),
@@ -225,9 +230,22 @@ export function createApp({
     else void voice?.resumePending();
     return c.json(settings);
   });
+  app.get('/api/memories', (c) => {
+    const dotId = c.req.query('dotId');
+    if (dotId === undefined)
+      return c.json({
+        memories: workspace
+          ? workspace.memoryScopes.annotate(store.memories())
+          : store.memories(),
+      });
+    if (!workspace?.dot(dotId)) return c.json({ error: 'Dot not found.' }, 404);
+    return c.json({
+      memories: workspace.memoryScopes.visible(store.memories(), dotId),
+    });
+  });
   app.post('/api/memories', async (c) => {
     const parsed = z
-      .object({ text: z.string().trim().min(1).max(2000) })
+      .object({ text: z.string().trim().min(1).max(2000), dotId: dotIdField })
       .strict()
       .safeParse(await c.req.json().catch(() => null));
     if (!parsed.success)
@@ -235,11 +253,16 @@ export function createApp({
         { error: 'Memory must be between 1 and 2,000 characters.' },
         400,
       );
-    return c.json(store.saveMemory(parsed.data.text), 201);
+    const { dotId } = parsed.data;
+    if (dotId && !workspace?.dot(dotId))
+      return c.json({ error: 'Dot not found.' }, 404);
+    const memory = store.saveMemory(parsed.data.text);
+    if (dotId && workspace) workspace.memoryScopes.set(memory.id, dotId);
+    return c.json({ ...memory, dotId: dotId ?? null }, 201);
   });
   app.put('/api/memories/:id', async (c) => {
     const parsed = z
-      .object({ text: z.string().trim().min(1).max(2000) })
+      .object({ text: z.string().trim().min(1).max(2000), dotId: dotIdField })
       .strict()
       .safeParse(await c.req.json().catch(() => null));
     if (!parsed.success)
@@ -249,7 +272,16 @@ export function createApp({
       );
     if (!store.memories().some((m) => m.id === c.req.param('id')))
       return c.json({ error: 'Memory not found.' }, 404);
-    return c.json(store.saveMemory(parsed.data.text, c.req.param('id')));
+    const { dotId } = parsed.data;
+    if (dotId && !workspace?.dot(dotId))
+      return c.json({ error: 'Dot not found.' }, 404);
+    const memory = store.saveMemory(parsed.data.text, c.req.param('id'));
+    if (dotId !== undefined && workspace)
+      workspace.memoryScopes.set(memory.id, dotId);
+    return c.json({
+      ...memory,
+      dotId: workspace?.memoryScopes.scopeOf(memory.id) ?? null,
+    });
   });
   app.delete('/api/memories/:id', (c) =>
     store.deleteMemory(c.req.param('id'))

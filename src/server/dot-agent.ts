@@ -269,7 +269,9 @@ export class DotAgent extends AbstractAgent {
         const pageContext = pages.context();
         const memories =
           initialSettings.memoryAllowed && dot.memoryAllowed
-            ? this.store.memories().map((memory) => memory.text)
+            ? this.workspace.memoryScopes
+                .visible(this.store.memories(), dot.id)
+                .map((memory) => memory.text)
             : [];
         const adapter = openaiCompatibleText(resolved.model, {
           apiKey: resolved.apiKey,
