@@ -3,6 +3,7 @@ import { pageReviewTool } from '../shared/page-review.js';
 import { ComputerService } from './computer-service.js';
 import { computerTools } from './computer-tools.js';
 import { pageAccess, pageTools } from './page-tools.js';
+import { cachedBridgeTools } from './bridge-clients.js';
 import { mcpTools } from './tools/mcp/index.js';
 import { HandoffService } from './handoff/index.js';
 import { AbstractAgent } from '@ag-ui/client';
@@ -288,6 +289,7 @@ export class DotAgent extends AbstractAgent {
         const serverTools = [
           ...tools,
           ...mcpTools,
+          ...cachedBridgeTools(),
           ...pageTools(pages),
           ...(computer.configured
             ? computerTools(computer, dot.id, check, controller.signal)
