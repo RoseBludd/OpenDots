@@ -23,6 +23,7 @@ import { developmentGuidance } from './computer-guidance.js';
 import { resilientFetch } from './resilient-fetch.js';
 import type { PlatformConfig } from './platform-config.js';
 import { browserResponse } from './research.js';
+import { resolveDotModel } from './dot-model.js';
 const channelError = () => ({
   type: EventType.RUN_ERROR,
   message:
@@ -95,12 +96,11 @@ export class DotAgent extends AbstractAgent {
           input.threadId,
           dot.id,
         );
-        if (
-          !this.config.intelligenceKey ||
-          !this.config.apiKey ||
-          !this.config.model
-        )
+        if (!this.config.intelligenceKey)
           throw new Error('Intelligence and model configuration are required.');
+        // Per-Dot model and key (WO-03); throws "Model not configured" rather
+        // than falling back when a desk's key is missing.
+        const resolved = resolveDotModel(dot, this.config);
         const initialSettings = this.store.settings();
         const check = () => {
           const settings = this.store.settings();
@@ -271,12 +271,13 @@ export class DotAgent extends AbstractAgent {
           initialSettings.memoryAllowed && dot.memoryAllowed
             ? this.store.memories().map((memory) => memory.text)
             : [];
-        const adapter = openaiCompatibleText(this.config.model, {
-          apiKey: this.config.apiKey,
+        const adapter = openaiCompatibleText(resolved.model, {
+          apiKey: resolved.apiKey,
           baseURL: this.config.baseUrl ?? 'https://api.openai.com/v1',
           api: 'chat-completions',
           maxRetries: 1,
           fetch: resilientFetch(),
+          defaultHeaders: resolved.headers,
         });
         const serverTools = [
           ...tools,

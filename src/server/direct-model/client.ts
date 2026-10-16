@@ -13,6 +13,8 @@ export interface DirectModelConfig {
   fallbackModel?: string;
   temperature?: number;
   maxOutputTokens?: number;
+  /** Extra request headers, e.g. X-Cadis-Desk for a desk-scoped Dot. */
+  headers?: Record<string, string>;
 }
 
 export interface ChatMessage {
@@ -103,6 +105,7 @@ async function attempt(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...config.headers,
         Authorization: `Bearer ${config.apiKey}`,
       },
       signal: options.signal,

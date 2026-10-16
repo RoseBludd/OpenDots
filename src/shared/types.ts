@@ -85,6 +85,10 @@ export interface Dot {
   avatar?: string | null;
   /** Host folder this Dot's computer is limited to, mounted at /workspace/project. */
   projectPath?: string | null;
+  /** Model override (see shared/dot-model.ts); null uses the server default. */
+  model?: string | null;
+  /** Desk whose key (CADIS_API_KEY_<DESK>) this Dot uses; null uses OPENAI_API_KEY. */
+  desk?: string | null;
 }
 export interface Conversation {
   id: string;
