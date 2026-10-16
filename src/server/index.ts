@@ -168,6 +168,7 @@ const app = createApp({
   direct,
   auth,
   familyMode,
+  workspace,
 });
 if (familyStore && auth)
   app.route(
