@@ -197,14 +197,7 @@ This is a single-owner starting point. Shared editing, invitations, file uploads
 
 ## Tools and MCP servers
 
-This project includes a tool registry under `src/server/tools/mcp/` that implements the MCP (Model Context Protocol) client/tool layer. The registry provides tools for reading public pages and performing web searches, enabling Dots to interact with external resources.
-
-### MCP Tools
-
-- **read_public_page**: Reads a provided canonical public HTTP(S) URL in a separate read-only browser, returning source evidence.
-- **search_web**: Searches public web sources and reads relevant excerpts for a research question, returning source URLs for citations.
-
-These tools are integrated into the Dot agent and can be used by Dots to access external information.
+`read_public_page` and `search_web` are provided by the research stack built into the Dot agent (Parallel Search MCP by default, or the browser reader with `WEB_SEARCH_PROVIDER=browser`); see Research below. There is no separate tool registry module.
 
 ## Contributing
 

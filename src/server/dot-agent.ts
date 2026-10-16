@@ -4,7 +4,6 @@ import { ComputerService } from './computer-service.js';
 import { computerTools } from './computer-tools.js';
 import { pageAccess, pageTools } from './page-tools.js';
 import { cachedBridgeTools } from './bridge-clients.js';
-import { mcpTools } from './tools/mcp/index.js';
 import { HandoffService } from './handoff/index.js';
 import { AbstractAgent } from '@ag-ui/client';
 import { type BaseEvent, type RunAgentInput, EventType } from '@ag-ui/core';
@@ -288,7 +287,6 @@ export class DotAgent extends AbstractAgent {
         });
         const serverTools = [
           ...tools,
-          ...mcpTools,
           ...cachedBridgeTools(),
           ...pageTools(pages),
           ...(computer.configured
