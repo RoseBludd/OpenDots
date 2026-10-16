@@ -67,7 +67,18 @@ function ipToLong(ip: string): number | null {
 // Treat those sources as the owner: the network boundary is the auth layer
 // (tailscale-only deployment); the bearer token remains valid and still gates
 // any source that somehow presents a non-tailnet forwarded address.
-function trustedTailnetSource(forwarded: string | undefined): boolean {
+// Tailnet CGNAT + host-private docker bridge networks (Traefik edge,
+// app-egress members). Public sources never match, so the bearer gate still
+// protects the app from anything that reaches it from the internet.
+function inPrivateRanges(value: number): boolean {
+  return (
+    (value >= ipToLong('100.64.0.0')! && value <= ipToLong('100.127.255.255')!) ||
+    (value >= ipToLong('10.0.0.0')! && value <= ipToLong('10.255.255.255')!) ||
+    (value >= ipToLong('172.16.0.0')! && value <= ipToLong('172.31.255.255')!) ||
+    (value >= ipToLong('192.168.0.0')! && value <= ipToLong('192.168.255.255')!)
+  );
+}
+function trustedTailnetSource(forwarded: string | undefined): boolean {function trustedTailnetSource(forwarded: string | undefined): boolean {
   if (!forwarded) return false; // direct edge access keeps the bearer gate
   return forwarded.split(',').every((raw) => {
     let ip = raw.trim().toLowerCase();
@@ -75,7 +86,7 @@ function trustedTailnetSource(forwarded: string | undefined): boolean {
     if (ip === '::1' || ip.startsWith('127.')) return true;
     const value = ipToLong(ip);
     if (value === null) return false;
-    return value >= ipToLong('100.64.0.0')! && value <= ipToLong('100.127.255.255')!;
+    return inPrivateRanges(value);
   });
 }
 export function createApp({

@@ -119,6 +119,15 @@ describe('API boundaries', () => {
       ).status,
     ).toBe(200);
   });
+  it('trusts host-private docker bridge sources (Traefik edge) without a token', async () => {
+    const { app } = fixture('private-token');
+    expect(
+      (await app.request('/api/state', { headers: { 'X-Forwarded-For': '10.0.14.3' } })).status,
+    ).toBe(200);
+    expect(
+      (await app.request('/api/state', { headers: { 'X-Forwarded-For': '172.18.0.5' } })).status,
+    ).toBe(200);
+  });
   it('keeps requiring the token without a forwarded source or a non-tailnet one', async () => {
     const { app } = fixture('private-token');
     expect((await app.request('/api/state')).status).toBe(401);
