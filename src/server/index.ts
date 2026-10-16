@@ -169,6 +169,7 @@ const app = createApp({
   direct,
   auth,
   familyMode,
+  workspace,
   handoff,
 });
 if (familyStore && auth)

@@ -1,0 +1,26 @@
+# WO-TWIN-06 pilot — staged `.paperclip.yaml` change for the `devvy` agent in
+# companies/genius-substrates (repo genius-paperclip-companies). Every other
+# agent and company stays on Hermes :8642; hermes-core keeps running.
+#
+# Apply by replacing the devvy agent's `adapter` block in
+# genius-paperclip-companies/companies/genius-substrates/.paperclip.yaml:
+#
+#     adapter:
+#       type: hermes_gateway
+#       config:
+#         apiBaseUrl: http://10.0.1.1:4320/paperclip
+#         paperclipApiUrl: https://paperclip.geniuzs.com
+#         timeoutSec: 1800
+#         # 10.0.1.1 is remote plain HTTP; loopback-only escape hatch for the tailnet pilot.
+#         dangerouslyAllowInsecureRemoteHttp: true
+#
+# The bridge speaks the same contract the adapter already sends to Hermes
+# (POST /v1/runs, GET /v1/runs/{run_id}, Bearer auth), so no adapter change is
+# needed — only apiBaseUrl plus the bridge key:
+#
+#   apiKey: <PAPERCLIP_BRIDGE_TOKEN>   # dedicated bridge token, NOT API_SERVER_KEY
+#
+# Operator env for OpenDots (env file mode 600, never committed):
+#   PAPERCLIP_BRIDGE_TOKEN=<random 32+ chars>
+#   PAPERCLIP_BRIDGE_DESK_MAP=deployment/paperclip/desk-map.tsv
+#   PAPERCLIP_BRIDGE_ALLOWED_NETS=127.0.0.1,::1,100.64.0.0/10

@@ -5,6 +5,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { Store } from './store.js';
 import { Runner } from './runner.js';
+import type { WorkspaceStore } from './workspace.js';
 import { parseCron, validTz } from './cron.js';
 import { configured, type Config } from './research.js';
 import type { Platform } from './platform.js';
@@ -14,6 +15,8 @@ import { authRoutes } from './auth-routes.js';
 import type { AuthStore } from './auth-store.js';
 import type { DirectModel } from './direct-model/index.js';
 import { directModelRoutes } from './direct-model/routes.js';
+import { paperclipBridgeRoutes } from './paperclip-bridge.js';
+import type { PaperclipBridgeOptions } from './paperclip-bridge.js';
 import { HandoffService } from './handoff/index.js';
 const interval = z.number().int().min(60).max(31_536_000).nullable();
 export interface AppOptions {
@@ -26,6 +29,13 @@ export interface AppOptions {
   direct?: DirectModel;
   auth?: AuthStore;
   familyMode?: boolean;
+  /** Workspace for the Paperclip wake bridge when neither platform nor direct mode is active. */
+  workspace?: WorkspaceStore;
+  /** Paperclip wake bridge (WO-TWIN-06); token absent keeps the bridge disabled. */
+  paperclipBridge?: Omit<
+    PaperclipBridgeOptions,
+    'store' | 'runner' | 'workspace'
+  >;
   handoff?: HandoffService;
 }
 function bearerAuthorized(
@@ -51,11 +61,13 @@ export function createApp({
   direct: directOption,
   auth,
   familyMode = false,
+  workspace: workspaceOption,
+  paperclipBridge,
   handoff,
 }: AppOptions) {
   const direct = platform ? undefined : directOption;
   // Per-Dot memory scope (WO-02) lives with the Dots; absent in sample mode.
-  const workspace = platform?.workspace ?? direct?.workspace;
+  const workspace = platform?.workspace ?? direct?.workspace ?? workspaceOption;
   const dotIdField = z.string().min(1).max(200).nullable().optional();
   const app = new Hono();
   if (auth) app.route('/api/auth', authRoutes(auth, origin));
@@ -111,6 +123,10 @@ export function createApp({
   const voice = platform ? new VoiceService(platform) : undefined;
   if (platform && voice) app.route('/api', workspaceRoutes(platform, voice));
   if (direct) app.route('/api', directModelRoutes(direct));
+  app.route(
+    '/paperclip',
+    paperclipBridgeRoutes({ store, runner, workspace, ...paperclipBridge }),
+  );
   if (handoff) {
     app.get('/api/handoff/registry', (c) => {
       return c.json(handoff.registry());
