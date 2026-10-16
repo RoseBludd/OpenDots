@@ -1,4 +1,5 @@
 import { webSearchProvider } from './parallel.js';
+import { primeBridgeTools } from './bridge-clients.js';
 import { createShutdown } from './shutdown.js';
 import { reportChannelFailure, safeFailure } from './slack-channel.js';
 import { serve } from '@hono/node-server';
@@ -202,6 +203,7 @@ const server = serve({ fetch: app.fetch, hostname: host, port }, (info) => {
       : `OpenDots template listening on http://${host}:${info.port}`,
   );
   runner.start();
+  primeBridgeTools();
   if (platform)
     void platform
       .start()

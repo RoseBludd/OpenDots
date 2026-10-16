@@ -1,0 +1,42 @@
+{
+  "$schema": "./opendots-bridges.schema.json",
+  "bridges": [
+    {
+      "name": "emailzs",
+      "url": "https://127.0.0.1:3101/mcp",
+      "allow": [
+        "list_*",
+        "get_*",
+        "create_campaign",
+        "update_campaign",
+        "create_template",
+        "preview_send"
+      ],
+      "deny": [
+        "send_campaign",
+        "enroll_*",
+        "delete_*",
+        "create_mission",
+        "run_live_test"
+      ]
+    },
+    {
+      "name": "callerzs",
+      "url": "https://127.0.0.1:3102/mcp",
+      "allow": [
+        "list_*",
+        "get_*",
+        "create_script",
+        "update_script",
+        "preview_live_test",
+        "run_simulated_test"
+      ],
+      "deny": [
+        "run_live_test",
+        "create_mission",
+        "delete_*",
+        "enroll_*"
+      ]
+    }
+  ]
+}
