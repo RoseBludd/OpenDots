@@ -13,6 +13,7 @@ import { authRoutes } from './auth-routes.js';
 import type { AuthStore } from './auth-store.js';
 import type { DirectModel } from './direct-model/index.js';
 import { directModelRoutes } from './direct-model/routes.js';
+import { HandoffService } from './handoff/index.js';
 const interval = z.number().int().min(60).max(31_536_000).nullable();
 export interface AppOptions {
   store: Store;
@@ -21,10 +22,10 @@ export interface AppOptions {
   ownerToken?: string;
   origin?: string;
   platform?: Platform;
-  /** Direct-model mode (no Intelligence key); ignored when a platform exists. */
   direct?: DirectModel;
   auth?: AuthStore;
   familyMode?: boolean;
+  handoff?: HandoffService;
 }
 function bearerAuthorized(
   c: { req: { header: (n: string) => string | undefined } },
@@ -49,6 +50,7 @@ export function createApp({
   direct: directOption,
   auth,
   familyMode = false,
+  handoff,
 }: AppOptions) {
   const direct = platform ? undefined : directOption;
   // Per-Dot memory scope (WO-02) lives with the Dots; absent in sample mode.
@@ -108,6 +110,11 @@ export function createApp({
   const voice = platform ? new VoiceService(platform) : undefined;
   if (platform && voice) app.route('/api', workspaceRoutes(platform, voice));
   if (direct) app.route('/api', directModelRoutes(direct));
+  if (handoff) {
+    app.get('/api/handoff/registry', (c) => {
+      return c.json(handoff.registry());
+    });
+  }
   app.get('/api/state', (c) =>
     c.json({
       settings: store.settings(),
