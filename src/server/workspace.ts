@@ -28,6 +28,8 @@ export class WorkspaceStore {
       ['dots', 'skillDeliveryEnabled', 'INTEGER NOT NULL DEFAULT 0'],
       ['dots', 'avatar', 'TEXT'],
       ['dots', 'projectPath', 'TEXT'],
+      ['dots', 'model', 'TEXT'],
+      ['dots', 'desk', 'TEXT'],
       ['thread_bindings', 'learningContainerId', 'TEXT'],
     ]) {
       if (
@@ -253,6 +255,22 @@ export class WorkspaceStore {
       this.db.exec('ROLLBACK');
       throw error;
     }
+    return this.dot(id)!;
+  }
+  /** Per-Dot model and desk (WO-03); undefined leaves a field unchanged. */
+  setDotModel(
+    id: string,
+    patch: { model?: string | null; desk?: string | null },
+  ): Dot {
+    const current = this.dot(id);
+    if (!current) throw new Error('Dot not found.');
+    this.db
+      .prepare('UPDATE dots SET model=?, desk=? WHERE id=?')
+      .run(
+        patch.model === undefined ? (current.model ?? null) : patch.model,
+        patch.desk === undefined ? (current.desk ?? null) : patch.desk,
+        id,
+      );
     return this.dot(id)!;
   }
   /** Removes a Dot with its local conversation bindings, calls, tasks and page threads. */

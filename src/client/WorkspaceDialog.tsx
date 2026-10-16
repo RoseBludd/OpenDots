@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { DESK_PATTERN, DOT_MODELS } from '../shared/dot-model';
 import { Trash2, X } from 'lucide-react';
 import { Mascot, characters } from './Mascot';
 import type {
@@ -71,6 +72,12 @@ export function WorkspaceDialog({
   );
   const [projectPath, setProjectPath] = useState(
     dialog.type === 'dot' ? (dialog.dot?.projectPath ?? '') : '',
+  );
+  const [dotModel, setDotModel] = useState(
+    dialog.type === 'dot' ? (dialog.dot?.model ?? '') : '',
+  );
+  const [desk, setDesk] = useState(
+    dialog.type === 'dot' ? (dialog.dot?.desk ?? '') : '',
   );
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -225,6 +232,8 @@ export function WorkspaceDialog({
                 skillDeliveryEnabled: skillDelivery,
                 avatar,
                 projectPath: projectPath.trim() || null,
+                model: dotModel || null,
+                desk: desk.trim().toLowerCase() || null,
               };
             }
             if (dialog.type === 'settings') {
@@ -336,6 +345,41 @@ export function WorkspaceDialog({
               <p className="muted">
                 Its computer sees only this folder, at <code>project/</code>.
                 Changing it stops the computer; start it again to apply.
+              </p>
+            </fieldset>
+          )}
+          {dialog.type === 'dot' && (
+            <fieldset className="space-access-fields">
+              <legend>Model</legend>
+              <label className="field-label" htmlFor="dot-model">
+                Model this Dot uses
+              </label>
+              <select
+                id="dot-model"
+                value={dotModel}
+                onChange={(event) => setDotModel(event.target.value)}
+              >
+                <option value="">Server default</option>
+                {DOT_MODELS.map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))}
+              </select>
+              <label className="field-label" htmlFor="dot-desk">
+                Desk key (optional)
+              </label>
+              <input
+                id="dot-desk"
+                value={desk}
+                maxLength={32}
+                placeholder="e.g. devvy (blank = shared server key)"
+                onChange={(event) => setDesk(event.target.value)}
+              />
+              <p className="muted">
+                {desk.trim() && !DESK_PATTERN.test(desk.trim().toLowerCase())
+                  ? 'Use lowercase letters, digits and dashes.'
+                  : 'A desk uses its own server key and never falls back to another one.'}
               </p>
             </fieldset>
           )}

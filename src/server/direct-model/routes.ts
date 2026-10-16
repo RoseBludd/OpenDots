@@ -5,6 +5,7 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { z } from 'zod';
 import { DirectModel, DirectModelError } from './index.js';
+import { dotModelSchema } from '../dot-model.js';
 
 const requiresIntelligence = (feature: string) => ({
   error: `${feature} requires Intelligence (INTELLIGENCE_API_KEY). This server is running in direct-model mode, which supports Dot conversations and tasks.`,
@@ -121,6 +122,20 @@ export function directModelRoutes(direct: DirectModel) {
         });
       }
     });
+  });
+  app.put('/dots/:id/model', async (c) => {
+    const data = dotModelSchema.safeParse(await c.req.json().catch(() => null));
+    if (!data.success)
+      return c.json(
+        {
+          error:
+            'Choose a model (cadis-free or cadis) and an optional desk name (lowercase letters, digits, dashes).',
+        },
+        400,
+      );
+    if (!workspace.dot(c.req.param('id')))
+      return c.json({ error: 'Dot not found.' }, 404);
+    return c.json(workspace.setDotModel(c.req.param('id'), data.data));
   });
   app.get('/conversations/:id/capture', (c) =>
     owned(c.req.param('id'))
