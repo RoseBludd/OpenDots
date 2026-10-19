@@ -3283,7 +3283,8 @@ h3 {
   margin-bottom: 23px;
 }
 .template-app .wordmark-dot {
-  display: none;
+  font-size: inherit;
+  margin-left: 0;
 }
 .template-app .nav-item,
 .template-app .dot-nav,
