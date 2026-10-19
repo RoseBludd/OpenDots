@@ -9,7 +9,7 @@
 name: opendots-host
 services:
   app:
-    image: opendots-app:9003744-host
+    image: opendots-app:c96109d-host
     env_file: .env
     environment:
       HOST: 0.0.0.0
@@ -35,7 +35,7 @@ services:
     security_opt: ['no-new-privileges:true']
     cap_drop: [ALL]
   tailnet-guard:
-    image: opendots-app:9003744-host
+    image: opendots-app:c96109d-host
     entrypoint: ['node', '/guard/tailnet-guard.mjs']
     network_mode: host
     environment:
