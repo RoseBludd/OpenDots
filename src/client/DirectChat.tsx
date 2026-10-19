@@ -77,6 +77,7 @@ export function DirectChat({
         <Mascot
           identity={dot.id}
           character={dot.avatar}
+          hue={dot.hue}
           name={dot.name}
           small
           state={running ? 'working' : paused ? 'paused' : 'idle'}

@@ -2,7 +2,7 @@ import sqlite3, re, uuid, datetime, os, sys
 DB='/mnt/genius_vol_1/docker/volumes/opendots-host_opendots-data/_data/opendots.sqlite'
 SEATS='/mnt/genius_vol_2/opendots/handoff/seats'
 con=sqlite3.connect(DB, timeout=30); con.execute('pragma busy_timeout=30000')
-dots={n.replace('. (desk)',''):i for i,n in con.execute("select id,name from dots where name like '%. (desk)'")}
+dots={n.replace(' (desk)','').rstrip('.'):i for i,n in con.execute("select id,name from dots where name like '%.' or name like '%. (desk)'")}
 hdr=re.compile(r'^### (user|assistant) · (\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}) CT\s*$', re.M)
 NS=uuid.UUID('6f1c0a52-0000-4000-8000-5ea7415701ff')
 tot=0
@@ -16,12 +16,19 @@ for seat,did in sorted(dots.items()):
         off=5 if (mo,d)<(11,1) and (mo,d)>=(3,9) else 6
         ts=int(datetime.datetime(y,mo,d,h,mi,tzinfo=datetime.timezone.utc).timestamp()*1000)+off*3600000
         msgs.append((m.group(1),body,ts))
+    title=f'{seat}. — Grok Bot history'
     if not msgs:
-        body=txt.split('\n',1)[1].strip() if txt.startswith('#') else txt.strip()
-        msgs=[('assistant',body,1792108800000)]
+        title=f'{seat}. — handoff brief and work log'
+        for label,fn in (('Brief','BRIEF.md'),('Current state','STATE.md'),('Work log','log.md')):
+            fp=f'{SEATS}/{seat}/{fn}'
+            if os.path.exists(fp) and os.path.getsize(fp)>0:
+                body=re.sub(r'^# .*\n+','',open(fp).read(),count=1).strip()
+                msgs.append(('assistant',f'**{label}**\n\n{body}',int(os.path.getmtime(fp)*1000)))
+        if not msgs: print(seat,'nothing to import'); continue
+        msgs.sort(key=lambda m:m[2])
     tid=str(uuid.uuid5(NS,seat))
     con.execute('delete from direct_messages where threadId=?',(tid,)); con.execute('delete from thread_bindings where id=?',(tid,))
-    con.execute('insert into thread_bindings(id,dotId,ownerId,title,createdAt) values(?,?,?,?,?)',(tid,did,'opendots-owner',f'{seat}. — Grok Bot history (imported)',msgs[0][2]))
+    con.execute('insert into thread_bindings(id,dotId,ownerId,title,createdAt) values(?,?,?,?,?)',(tid,did,'opendots-owner',title,msgs[0][2]))
     last=0
     for k,(r,b,ts) in enumerate(msgs):
         ts=max(ts,last+1); last=ts

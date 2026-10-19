@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { Platform } from './platform.js';
 import { VoiceService } from './voice.js';
 import { resolveProjectPath } from './project-path.js';
-import { dotModelFields, dotModelSchema } from './dot-model.js';
+import { dotLookSchema, dotModelFields, dotModelSchema } from './dot-model.js';
 import {
   learningContainerIdSchema,
   validateLearningSettings,
@@ -169,6 +169,17 @@ export function workspaceRoutes(platform: Platform, voice: VoiceService) {
       // recreates it with the new folder (its files and logins are kept).
       await platform.computers.stop(current.id).catch(() => undefined);
     return c.json(updated);
+  });
+  app.put('/dots/:id/look', async (c) => {
+    const data = dotLookSchema.safeParse(await c.req.json().catch(() => null));
+    if (!data.success)
+      return c.json(
+        { error: 'Use pinned (true/false) and hue (0-359 or null).' },
+        400,
+      );
+    if (!platform.workspace.dot(c.req.param('id')))
+      return c.json({ error: 'Dot not found.' }, 404);
+    return c.json(platform.workspace.setDotLook(c.req.param('id'), data.data));
   });
   app.put('/dots/:id/model', async (c) => {
     const data = dotModelSchema.safeParse(await c.req.json().catch(() => null));

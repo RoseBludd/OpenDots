@@ -18,6 +18,7 @@ export function Mascot({
   character,
   name = 'Dot',
   decorative = false,
+  hue,
 }: {
   state?: string;
   small?: boolean;
@@ -25,6 +26,8 @@ export function Mascot({
   character?: string | null;
   name?: string;
   decorative?: boolean;
+  /** hue-rotate offset in degrees that tints the character; null/undefined keeps its own color. */
+  hue?: number | null;
 }) {
   return (
     <span className={`mascot ${state} ${small ? 'small' : ''}`}>
@@ -35,6 +38,7 @@ export function Mascot({
         width={512}
         height={512}
         draggable={false}
+        style={hue ? { filter: `hue-rotate(${hue}deg)` } : undefined}
       />
     </span>
   );

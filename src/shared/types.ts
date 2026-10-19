@@ -93,6 +93,10 @@ export interface Dot {
   skillDeliveryEnabled?: boolean;
   /** Chosen mascot; null/undefined falls back to a stable per-Dot default. */
   avatar?: string | null;
+  /** Pinned Dots sort to the top of the sidebar. */
+  pinned?: boolean;
+  /** Mascot tint as a hue-rotate offset in degrees (0-359); null keeps the character's own color. */
+  hue?: number | null;
   /** Host folder this Dot's computer is limited to, mounted at /workspace/project. */
   projectPath?: string | null;
   /** Model override (see shared/dot-model.ts); null uses the server default. */

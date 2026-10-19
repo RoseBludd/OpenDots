@@ -33,6 +33,8 @@ export class WorkspaceStore {
       ['dots', 'projectPath', 'TEXT'],
       ['dots', 'model', 'TEXT'],
       ['dots', 'desk', 'TEXT'],
+      ['dots', 'pinned', 'INTEGER NOT NULL DEFAULT 0'],
+      ['dots', 'hue', 'INTEGER'],
       ['thread_bindings', 'learningContainerId', 'TEXT'],
     ]) {
       if (
@@ -130,6 +132,7 @@ export class WorkspaceStore {
         researchAllowed: !!row.researchAllowed,
         memoryAllowed: !!row.memoryAllowed,
         skillDeliveryEnabled: !!row.skillDeliveryEnabled,
+        pinned: !!row.pinned,
       })) as unknown as Dot[];
   }
   dot(id: string) {
@@ -273,6 +276,22 @@ export class WorkspaceStore {
       .run(
         patch.model === undefined ? (current.model ?? null) : patch.model,
         patch.desk === undefined ? (current.desk ?? null) : patch.desk,
+        id,
+      );
+    return this.dot(id)!;
+  }
+  /** Sidebar look: pin to top and mascot tint; undefined leaves a field unchanged. */
+  setDotLook(
+    id: string,
+    patch: { pinned?: boolean; hue?: number | null },
+  ): Dot {
+    const current = this.dot(id);
+    if (!current) throw new Error('Dot not found.');
+    this.db
+      .prepare('UPDATE dots SET pinned=?, hue=? WHERE id=?')
+      .run(
+        (patch.pinned ?? current.pinned) ? 1 : 0,
+        patch.hue === undefined ? (current.hue ?? null) : patch.hue,
         id,
       );
     return this.dot(id)!;

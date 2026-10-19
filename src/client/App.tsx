@@ -14,6 +14,7 @@ import {
   Monitor,
   MoreHorizontal,
   Pause,
+  Pin,
   PanelLeft,
   Play,
   Plus,
@@ -538,35 +539,50 @@ export function App() {
           )}
         </div>
         <nav className="dots-nav" aria-label="Dots">
-          {workspace.dots.map((item) => (
-            <div className="dot-nav-row" key={item.id}>
-              <button
-                className={`dot-nav ${dot.id === item.id && view === 'chat' ? 'active' : ''}`}
-                aria-current={
-                  dot.id === item.id && view === 'chat' ? 'page' : undefined
-                }
-                onClick={() => chooseDot(item)}
-              >
-                <Mascot
-                  identity={item.id}
-                  character={item.avatar}
-                  name={item.name}
-                  small
-                  decorative
-                />
-                <span>{item.name}</span>
-              </button>
-              <button
-                className="icon-button dot-settings"
-                aria-label={`Edit ${item.name} settings`}
-                onClick={() =>
-                  setDialog({ type: 'dot', dot: item, spaceId: item.spaceId })
-                }
-              >
-                <MoreHorizontal size={15} />
-              </button>
-            </div>
-          ))}
+          {[...workspace.dots]
+            .sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned))
+            .map((item) => (
+              <div className="dot-nav-row" key={item.id}>
+                <button
+                  className={`dot-nav ${dot.id === item.id && view === 'chat' ? 'active' : ''}`}
+                  aria-current={
+                    dot.id === item.id && view === 'chat' ? 'page' : undefined
+                  }
+                  onClick={() => chooseDot(item)}
+                >
+                  <Mascot
+                    identity={item.id}
+                    character={item.avatar}
+                    hue={item.hue}
+                    name={item.name}
+                    small
+                    decorative
+                  />
+                  <span>{item.name}</span>
+                </button>
+                <button
+                  className={`icon-button dot-pin ${item.pinned ? 'pinned' : ''}`}
+                  aria-label={`${item.pinned ? 'Unpin' : 'Pin'} ${item.name}`}
+                  aria-pressed={!!item.pinned}
+                  onClick={() =>
+                    void mutate(`/dots/${item.id}/look`, 'PUT', {
+                      pinned: !item.pinned,
+                    })
+                  }
+                >
+                  <Pin size={13} />
+                </button>
+                <button
+                  className="icon-button dot-settings"
+                  aria-label={`Edit ${item.name} settings`}
+                  onClick={() =>
+                    setDialog({ type: 'dot', dot: item, spaceId: item.spaceId })
+                  }
+                >
+                  <MoreHorizontal size={15} />
+                </button>
+              </div>
+            ))}
         </nav>
         {direct ? (
           <div className="sidebar-empty direct-mode-note">

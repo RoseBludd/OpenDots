@@ -28,6 +28,11 @@ export const dotModelFields = {
     .nullable()
     .optional(),
 };
+export const dotLookSchema = z.object({
+  pinned: z.boolean().optional(),
+  hue: z.number().int().min(0).max(359).nullable().optional(),
+});
+
 export const dotModelSchema = z.object(dotModelFields).strict();
 
 export class DotModelError extends Error {}

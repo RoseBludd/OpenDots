@@ -4306,3 +4306,19 @@ h3 {
   border-radius: 8px;
   margin-top: 6px;
 }
+
+.dot-nav-row > .dot-pin {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.dot-nav-row:hover > .dot-pin,
+.dot-nav-row > .dot-pin:focus-visible,
+.dot-nav-row > .dot-pin.pinned {
+  opacity: 1;
+}
+.dot-nav-row > .dot-pin.pinned {
+  color: #6077b7;
+}
+.dot-nav-row > .dot-pin.pinned svg {
+  fill: currentColor;
+}
