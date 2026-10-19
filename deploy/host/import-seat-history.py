@@ -3,7 +3,7 @@ DB='/mnt/genius_vol_1/docker/volumes/opendots-host_opendots-data/_data/opendots.
 SEATS='/mnt/genius_vol_2/opendots/handoff/seats'
 con=sqlite3.connect(DB, timeout=30); con.execute('pragma busy_timeout=30000')
 dots={n.replace(' (desk)','').rstrip('.'):i for i,n in con.execute("select id,name from dots where name like '%.' or name like '%. (desk)'")}
-hdr=re.compile(r'^### (user|assistant) · (\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}) CT\s*$', re.M)
+hdr=re.compile(r'^### (user|assistant|send) · (\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}) CT((?: [←→] [\w.]+)*)\s*$', re.M)
 NS=uuid.UUID('6f1c0a52-0000-4000-8000-5ea7415701ff')
 tot=0
 for seat,did in sorted(dots.items()):
@@ -12,10 +12,12 @@ for seat,did in sorted(dots.items()):
     txt=open(p).read(); ms=list(hdr.finditer(txt)); msgs=[]
     for i,m in enumerate(ms):
         body=txt[m.end(): ms[i+1].start() if i+1<len(ms) else len(txt)].strip()
-        y,mo,d,h,mi=map(int,m.groups()[1:])
+        y,mo,d,h,mi=map(int,m.groups()[1:6]); tag=m.group(7).strip()
         off=5 if (mo,d)<(11,1) and (mo,d)>=(3,9) else 6
         ts=int(datetime.datetime(y,mo,d,h,mi,tzinfo=datetime.timezone.utc).timestamp()*1000)+off*3600000
-        msgs.append((m.group(1),body,ts))
+        role='user' if m.group(1)=='user' else 'assistant'
+        if tag: body=f'*{tag}*\n\n'+body
+        msgs.append((role,body,ts))
     title=f'{seat}. — Grok Bot history'
     if not msgs:
         title=f'{seat}. — handoff brief and work log'
