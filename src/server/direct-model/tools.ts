@@ -146,12 +146,14 @@ async function webSearch(query: string, options: ToolOptions): Promise<string> {
   if (!response.ok) throw new Error(`search returned HTTP ${response.status}`);
   const html = await readCapped(response);
   const results: string[] = [];
-  const re = /<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?(?:class="result__snippet"[^>]*>([\s\S]*?)<\/a>)?/g;
-  for (const match of html.matchAll(re)) {
-    let href = match[1].replace(/&amp;/g, '&');
+  for (const block of html.split(/(?=<a[^>]+class="result__a")/).slice(1)) {
+    const link = /<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/.exec(block);
+    if (!link) continue;
+    let href = link[1].replace(/&amp;/g, '&');
     const wrapped = /[?&]uddg=([^&]+)/.exec(href);
     if (wrapped) href = decodeURIComponent(wrapped[1]);
-    results.push(`${results.length + 1}. ${htmlToText(match[2])}\n   ${href}\n   ${htmlToText(match[3] ?? '')}`);
+    const snippet = /class="result__snippet"[^>]*>([\s\S]*?)<\/a>/.exec(block);
+    results.push(`${results.length + 1}. ${htmlToText(link[2])}\n   ${href}\n   ${htmlToText(snippet?.[1] ?? '')}`);
     if (results.length >= 8) break;
   }
   return results.length ? results.join('\n') : 'No results.';
