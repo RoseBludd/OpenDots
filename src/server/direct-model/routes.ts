@@ -5,7 +5,7 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { z } from 'zod';
 import { DirectModel, DirectModelError } from './index.js';
-import { dotLookSchema, dotModelSchema } from '../dot-model.js';
+import { dotLookSchema, dotModelSchema, dotOrderSchema } from '../dot-model.js';
 import { dotSchema } from '../workspace-routes.js';
 
 const requiresIntelligence = (feature: string) => ({
@@ -126,6 +126,12 @@ export function directModelRoutes(direct: DirectModel) {
         });
       }
     });
+  });
+  app.put('/dots/order', async (c) => {
+    const data = dotOrderSchema.safeParse(await c.req.json().catch(() => null));
+    if (!data.success)
+      return c.json({ error: 'Send ids: a list of Dot ids.' }, 400);
+    return c.json(workspace.setDotOrder(data.data.ids));
   });
   app.put('/dots/:id/look', async (c) => {
     const data = dotLookSchema.safeParse(await c.req.json().catch(() => null));
