@@ -6,6 +6,7 @@ import { lookup } from 'node:dns/promises';
 import { readdir, readFile, realpath, stat } from 'node:fs/promises';
 import { isIP } from 'node:net';
 import path from 'node:path';
+import { parallelSources } from '../parallel.js';
 
 // Tolerates model drift: "[[search: q]]", "[[search(query='q')]]", "[[search(q)]", and stray tool-call tokens.
 export const TOOL_RE =
@@ -21,6 +22,9 @@ export interface ToolOptions {
   filesRoot?: string;
   fetch?: typeof fetch;
   signal?: AbortSignal;
+  /** Search via the existing Parallel lane (parallel.ts); default PARALLEL_API_KEY. DuckDuckGo is the keyless fallback. */
+  parallelApiKey?: string;
+  parallelSearch?: typeof parallelSources;
 }
 
 export interface ToolCall {
@@ -132,7 +136,27 @@ async function readCapped(response: Response): Promise<string> {
   return Buffer.concat(chunks).toString('utf8');
 }
 
+async function parallelSearch(query: string, options: ToolOptions): Promise<string> {
+  const search = options.parallelSearch ?? parallelSources;
+  const sources = await search(
+    { objective: query },
+    { webSearchProvider: 'parallel', parallelApiKey: options.parallelApiKey },
+    options.signal ?? AbortSignal.timeout(60_000),
+  );
+  return sources
+    .map((page, index) => `${index + 1}. ${page.title}\n   ${page.url}\n   ${page.text.replace(/\s+/g, ' ').slice(0, 1200)}`)
+    .join('\n');
+}
+
 async function webSearch(query: string, options: ToolOptions): Promise<string> {
+  const key = options.parallelApiKey ?? process.env.PARALLEL_API_KEY?.trim();
+  if (key || options.parallelSearch) {
+    try {
+      return await parallelSearch(query, { ...options, parallelApiKey: key });
+    } catch (error) {
+      if (options.signal?.aborted) throw error;
+    }
+  }
   const response = await guardedFetch(
     'https://html.duckduckgo.com/html/',
     {

@@ -74,6 +74,21 @@ describe('desk tools', () => {
     expect(found).toContain('Snippet A');
   });
 
+  it('searches through the Parallel lane when configured, DuckDuckGo otherwise', async () => {
+    const out = await runTool({ name: 'search', arg: 'node lts' }, {
+      parallelSearch: (async (request: { objective: string }) => [
+        { title: 'Node.js Releases', url: 'https://nodejs.org/en/about/previous-releases', text: `LTS table for ${request.objective}` },
+      ]) as never,
+    });
+    expect(out).toContain('https://nodejs.org/en/about/previous-releases');
+    expect(out).toContain('LTS table for node lts');
+    const fallback = await runTool({ name: 'search', arg: 'x' }, {
+      parallelSearch: (async () => { throw new Error('quota'); }) as never,
+      fetch: (async () => new Response('<a class="result__a" href="https://e.com/">E</a>', { headers: { 'content-type': 'text/html' } })) as never,
+    });
+    expect(fallback).toContain('https://e.com/');
+  });
+
   it('runs a tool round and answers from the result', async () => {
     const filesRoot = await root();
     const calls: { role: string; content: string }[][] = [];
