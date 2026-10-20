@@ -283,7 +283,6 @@ describe('direct-model chat panel', () => {
     expect(html).toContain('<strong>green</strong>');
     expect(html).toContain('cadis');
     expect(html).toContain('Schedule a task in this conversation');
-    expect(html).toContain(client.DIRECT_MODE_NOTE.replace(/'/g, '&#x27;'));
     for (const hidden of [
       'Start voice call',
       'Save conversation as page',

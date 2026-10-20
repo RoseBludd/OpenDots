@@ -59,7 +59,17 @@ export function ChatTranscript({
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
-                  img: ({ alt }) => <span>{alt}</span>,
+                  img: ({ src, alt }) =>
+                    typeof src === 'string' && src.startsWith('/api/media/') ? (
+                      <img
+                        className="chat-media"
+                        src={src}
+                        alt={alt ?? ''}
+                        loading="lazy"
+                      />
+                    ) : (
+                      <span>{alt}</span>
+                    ),
                   a: ({ href, children }) => (
                     <a
                       onClick={(event) => {

@@ -13,7 +13,7 @@ import {
 import { ArrowUp, Clock3, Square } from 'lucide-react';
 import { ChatTranscript } from './ChatTranscript';
 import { Mascot } from './Mascot';
-import { DIRECT_MODE_NOTE, DirectChatSession } from './direct-chat';
+import { DirectChatSession } from './direct-chat';
 import type { Conversation, Dot } from '../shared/types';
 
 export function DirectChat({
@@ -177,7 +177,6 @@ export function DirectChat({
             </button>
           )}
         </div>
-        <div className="chat-compose-note">{DIRECT_MODE_NOTE}</div>
       </form>
     </div>
   );

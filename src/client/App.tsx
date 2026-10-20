@@ -36,7 +36,7 @@ import { api, ApiError, authHeaders, setToken } from './api';
 import { Mascot } from './Mascot';
 import { Chat } from './Chat';
 import { DirectChat } from './DirectChat';
-import { DIRECT_MODE_NOTE, dotModelLabel, isDirectMode } from './direct-chat';
+import { dotModelLabel, isDirectMode } from './direct-chat';
 import { LocalThreadList, ThreadList } from './ThreadList';
 import { ResultPane } from './ResultPane';
 import { TaskRow } from './TaskPresentation';
@@ -447,7 +447,6 @@ export function App() {
         <button
           aria-label="Open Spaces"
           disabled={direct}
-          title={direct ? DIRECT_MODE_NOTE : undefined}
           onClick={() => {
             if (workspace.spaces[0]) openPage(workspace.spaces[0].id);
           }}
@@ -585,9 +584,7 @@ export function App() {
             ))}
         </nav>
         {direct ? (
-          <div className="sidebar-empty direct-mode-note">
-            {DIRECT_MODE_NOTE}
-          </div>
+          <></>
         ) : (
           <>
             <div className="spaces-heading nav-label">
@@ -765,7 +762,7 @@ export function App() {
           </div>
         )}
         {view === 'space' && direct ? (
-          <div className="notice direct-mode-note">{DIRECT_MODE_NOTE}</div>
+          <div className="notice direct-mode-note">Pages need Intelligence.</div>
         ) : view === 'space' ? (
           <SpaceWorkspace
             key={spaceId}

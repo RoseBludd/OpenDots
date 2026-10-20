@@ -146,6 +146,8 @@ async function conversation(app: ReturnType<typeof createApp>, dotId: string) {
   return (await response.json()) as { id: string; dotId: string };
 }
 
+let peerId = '';
+
 describe('direct-model mode', () => {
   it('is enabled only without an Intelligence key and with a model key', () => {
     expect(directModeEnabled({ apiKey: 'k' })).toBe(true);
@@ -462,5 +464,36 @@ describe('direct-model mode', () => {
       ((await (await app.request('/api/state')).json()) as { mode: string })
         .mode,
     ).toBe('sample');
+  });
+  it('hands work to another desk, runs it there and relays the reply back', async () => {
+    const endpoint = await stub((body, call) => {
+      const last = body.messages.at(-1)!.content;
+      if (last.startsWith('Handoff from'))
+        return ok('Peer answer: the build is green.');
+      return ok(`Sure.\n[[handoff:${peerId}]] Check whether the build is green.`);
+    });
+    const { app, workspace, threads, direct, store } = fixture(endpoint);
+    const from = workspace.dots()[0];
+    const to = workspace.createDot(workspace.spaces()[0].id, "Peer", "Checks builds.", false, false);
+    peerId = to.id;
+    const thread = await conversation(app, from.id);
+    const response = await app.request(
+      `/api/conversations/${thread.id}/messages`,
+      post({ content: 'Ask the other desk about the build.' }),
+    );
+    const body = (await response.json()) as { message: { content: string } };
+    expect(body.message.content).toContain(`Handed to ${to.name}`);
+    expect(body.message.content).not.toContain('[[handoff');
+    const task = store.tasks().find((t) => t.prompt.startsWith('Handoff from'))!;
+    expect(task).toBeTruthy();
+    await direct.execute(
+      { id: task.id, prompt: task.prompt } as never,
+      [],
+      new AbortController().signal,
+      () => undefined,
+    );
+    const relayed = threads.messages(thread.id).at(-1)!;
+    expect(relayed.content).toContain('Peer answer: the build is green.');
+    expect(relayed.content).toContain(`Reply from ${to.name}`);
   });
 });

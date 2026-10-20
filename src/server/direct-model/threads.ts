@@ -24,10 +24,23 @@ export class DirectThreadStore {
     this.db = new DatabaseSync(path);
     this.db.exec(`PRAGMA busy_timeout=5000;
       CREATE TABLE IF NOT EXISTS direct_messages(id TEXT PRIMARY KEY, threadId TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, model TEXT, createdAt INTEGER NOT NULL);
-      CREATE INDEX IF NOT EXISTS direct_messages_thread ON direct_messages(threadId, createdAt);`);
+      CREATE INDEX IF NOT EXISTS direct_messages_thread ON direct_messages(threadId, createdAt);
+      CREATE TABLE IF NOT EXISTS direct_handoffs(taskId TEXT PRIMARY KEY, fromThread TEXT NOT NULL, fromDot TEXT NOT NULL, toDot TEXT NOT NULL, createdAt INTEGER NOT NULL);`);
   }
   close() {
     this.db.close();
+  }
+  recordHandoff(taskId: string, fromThread: string, fromDot: string, toDot: string) {
+    this.db
+      .prepare('INSERT OR REPLACE INTO direct_handoffs VALUES (?, ?, ?, ?, ?)')
+      .run(taskId, fromThread, fromDot, toDot, Date.now());
+  }
+  handoffOrigin(taskId: string) {
+    return this.db
+      .prepare('SELECT * FROM direct_handoffs WHERE taskId=?')
+      .get(taskId) as
+      | { taskId: string; fromThread: string; fromDot: string; toDot: string }
+      | undefined;
   }
   messages(threadId: string): StoredMessage[] {
     return this.db

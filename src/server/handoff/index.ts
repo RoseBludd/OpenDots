@@ -88,6 +88,7 @@ export class HandoffService {
     if (trimmedNote.length > 2000)
       throw new Error('Handoff note must be 2,000 characters or fewer.');
 
+    const sourceDot = this.workspace.dot(fromDot);
     const conversation = this.workspace.conversations().find((c) => c.id === thread);
     let threadId = thread;
     if (!conversation) {
@@ -95,7 +96,7 @@ export class HandoffService {
       const created = this.workspace.bindThread(
         randomUUID(),
         target.id,
-        `Handoff from ${target.name}`,
+        `Handoff from ${sourceDot?.name ?? fromDot}`,
       );
       threadId = created.id;
     } else if (conversation.dotId !== target.id) {

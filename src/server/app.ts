@@ -2,6 +2,8 @@ import { computerRoutes } from './computer-routes.js';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { timingSafeEqual } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { z } from 'zod';
 import { Store } from './store.js';
 import { Runner } from './runner.js';
@@ -157,6 +159,31 @@ export function createApp({
     )
       return c.json({ error: 'Use application/json.' }, 415);
     await next();
+  });
+  app.get('/api/media/:name', (c) => {
+    const name = c.req.param('name');
+    const type = (
+      {
+        png: 'image/png',
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        gif: 'image/gif',
+        webp: 'image/webp',
+        svg: 'image/svg+xml',
+      } as Record<string, string>
+    )[name.split('.').pop()?.toLowerCase() ?? ''];
+    if (!type || !/^[A-Za-z0-9._-]{1,160}$/.test(name) || name.includes('..'))
+      return c.json({ error: 'Not found.' }, 404);
+    const file = join(process.env.MEDIA_DIR || '/data/media', name);
+    if (!existsSync(file)) return c.json({ error: 'Not found.' }, 404);
+    return new Response(readFileSync(file), {
+      headers: {
+        'Content-Type': type,
+        'Cache-Control': 'private, max-age=86400',
+        'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'",
+        'X-Content-Type-Options': 'nosniff',
+      },
+    });
   });
   if (platform) app.route('/api', computerRoutes(platform.computers));
   const voice = platform ? new VoiceService(platform) : undefined;
