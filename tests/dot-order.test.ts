@@ -31,7 +31,7 @@ it('lists pinned Dots first and keeps a stored drag order', () => {
   ws.setDotOrder([b.id, a.id, c.id]);
   expect(ids()).toEqual([c.id, b.id, a.id]);
   ws.setDotLook(a.id, { pinned: true });
-  expect(ids()).toEqual([c.id, a.id, b.id]);
+  expect(ids()).toEqual([a.id, c.id, b.id]);
   ws.setDotOrder([a.id, c.id]);
   expect(ids().slice(0, 2)).toEqual([a.id, c.id]);
 });
