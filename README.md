@@ -228,6 +228,8 @@ Queries, requested URLs, a stable session identifier and the research objective 
 
 When `INTELLIGENCE_API_KEY` is empty and `OPENAI_API_KEY` is set, the server runs Dot conversations and background tasks on the OpenAI-compatible model directly (`src/server/direct-model/`). With the Intelligence key set, nothing changes.
 
+- **Desk handoff (no Intelligence needed):** the model may emit a line `[[handoff:<desk id>]] <request>`. The server queues it through `HandoffService` as a task in the target desk's thread (`Handoff from <desk>`), the runner executes it, and the answer is posted back into the sender's thread as `Reply from <desk>:`. Handoff tasks cannot hand off again; max 3 per reply. Origins live in the `direct_handoffs` table.
+- **Inline images:** `GET /api/media/<name>` serves png/jpg/gif/webp/svg from `MEDIA_DIR` (default `/data/media`), owner-authenticated; chat renders markdown images only for `/api/media/` URLs.
 - `GET /api/state` reports `mode: "direct-model"`; `GET /api/workspace` lists Spaces, Dots and conversations.
 - `POST /api/conversations` creates a local conversation for a Dot. `POST /api/conversations/:id/messages` with `{"content": "..."}` returns the reply; add `"stream": true` (or `Accept: text/event-stream`) for `delta`/`done`/`error` server-sent events. `GET /api/conversations/:id/messages` returns the stored history, which is kept in the same SQLite database.
 - Tasks (`POST /api/tasks`, optionally with a `threadId`) run on the model; a bound task's prompt and result are added to its conversation.
