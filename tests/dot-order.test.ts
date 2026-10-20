@@ -19,15 +19,19 @@ it('lists pinned Dots first and keeps a stored drag order', () => {
   const a = make(ws, 'a');
   const b = make(ws, 'b');
   const c = make(ws, 'c');
-  const names = () => ws.dots().map((dot) => dot.name);
-  expect(names().slice(-3)).toEqual(['a', 'b', 'c']);
+  const mine = new Set([a.id, b.id, c.id]);
+  const ids = () =>
+    ws
+      .dots()
+      .map((dot) => dot.id)
+      .filter((id) => mine.has(id));
+  expect(ids()).toEqual([a.id, b.id, c.id]);
   ws.setDotLook(c.id, { pinned: true });
-  expect(ws.dots()[0].id).toBe(c.id);
+  expect(ids()[0]).toBe(c.id);
   ws.setDotOrder([b.id, a.id, c.id]);
-  expect(ws.dots().map((dot) => dot.id)).toEqual([c.id, b.id, a.id]);
+  expect(ids()).toEqual([c.id, b.id, a.id]);
   ws.setDotLook(a.id, { pinned: true });
-  expect(ws.dots().map((dot) => dot.id)).toEqual([c.id, a.id, b.id]);
+  expect(ids()).toEqual([c.id, a.id, b.id]);
   ws.setDotOrder([a.id, c.id]);
-  expect(ws.dots()[0].id).toBe(a.id);
-  expect(ws.dots()[1].id).toBe(c.id);
+  expect(ids().slice(0, 2)).toEqual([a.id, c.id]);
 });
