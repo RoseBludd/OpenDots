@@ -146,7 +146,7 @@ async function webSearch(query: string, options: ToolOptions): Promise<string> {
   if (!response.ok) throw new Error(`search returned HTTP ${response.status}`);
   const html = await readCapped(response);
   const results: string[] = [];
-  for (const block of html.split(/(?=<a[^>]+class="result__a")/).slice(1)) {
+  for (const block of html.split(/(?=<a[^>]+class="result__a")/)) {
     const link = /<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/.exec(block);
     if (!link) continue;
     let href = link[1].replace(/&amp;/g, '&');
