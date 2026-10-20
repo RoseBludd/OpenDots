@@ -568,9 +568,24 @@ export function App() {
                 setDragDot(undefined);
                 if (!from || from === item.id) return;
                 const ids = workspace.dots.map((d) => d.id);
-                ids.splice(ids.indexOf(from), 1);
-                ids.splice(ids.indexOf(item.id), 0, from);
-                void mutate('/dots/order', 'PUT', { ids });
+                const fromIndex = ids.indexOf(from);
+                const toIndex = ids.indexOf(item.id);
+                const moved = workspace.dots[fromIndex];
+                ids.splice(fromIndex, 1);
+                ids.splice(
+                  fromIndex < toIndex
+                    ? ids.indexOf(item.id) + 1
+                    : ids.indexOf(item.id),
+                  0,
+                  from,
+                );
+                void (async () => {
+                  if (!!moved?.pinned !== !!item.pinned)
+                    await api(`/dots/${from}/look`, 'PUT', {
+                      pinned: !!item.pinned,
+                    });
+                  await mutate('/dots/order', 'PUT', { ids });
+                })();
               }}
             >
               <button
