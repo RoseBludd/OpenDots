@@ -36,6 +36,13 @@ describe('desk tools', () => {
     expect(stripToolCalls(text)).toBe('Looking.');
   });
 
+  it('accepts drifted tag shapes from the model', () => {
+    expect(parseToolCalls("<|tool_call_start|>[[search(query='node lts 2026')]<|tool_call_end|>")).toEqual([{ name: 'search', arg: 'node lts 2026' }]);
+    expect(parseToolCalls('[[fetch: https://example.com]]')).toEqual([{ name: 'fetch', arg: 'https://example.com' }]);
+    expect(parseToolCalls('[[read(path="archy/BRIEF.md")]]')).toEqual([{ name: 'read', arg: 'archy/BRIEF.md' }]);
+    expect(stripToolCalls("Hi <|tool_call_start|>[[search(query='x')]<|tool_call_end|>")).toBe('Hi');
+  });
+
   it('lists and reads files under the root only', async () => {
     const filesRoot = await root();
     expect(await runTool({ name: 'ls', arg: '.' }, { filesRoot })).toContain('dir  archy');

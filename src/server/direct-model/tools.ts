@@ -7,7 +7,9 @@ import { readdir, readFile, realpath, stat } from 'node:fs/promises';
 import { isIP } from 'node:net';
 import path from 'node:path';
 
-export const TOOL_RE = /\[\[(search|fetch|read|ls):\s*([^\]\n]+?)\s*\]\]/gi;
+// Tolerates model drift: "[[search: q]]", "[[search(query='q')]]", "[[search(q)]", and stray tool-call tokens.
+export const TOOL_RE =
+  /(?:<\|tool_call_start\|>)?\[\[\s*(search|fetch|read|ls)\s*[:(]\s*(?:(?:query|url|path|q)\s*=\s*)?['"]?([^\]\n]*?)['"]?\s*\)?\s*\]\]?(?:<\|tool_call_end\|>)?/gi;
 export const MAX_TOOL_ROUNDS = 4;
 const MAX_CALLS_PER_ROUND = 3;
 const MAX_RESULT_CHARS = 9000;
