@@ -137,7 +137,15 @@ export function createApp({
       return c.json({ error: 'Unrecognized host.' }, 403);
     const requestOrigin = c.req.header('origin');
     const expectedOrigin = origin ?? new URL(c.req.url).origin;
-    if (requestOrigin && requestOrigin !== expectedOrigin)
+    const extraOrigins = (process.env.APP_ALLOWED_ORIGINS ?? '')
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean);
+    if (
+      requestOrigin &&
+      requestOrigin !== expectedOrigin &&
+      !extraOrigins.includes(requestOrigin)
+    )
       return c.json({ error: 'Cross-origin requests are not allowed.' }, 403);
     if (c.req.header('sec-fetch-site') === 'cross-site')
       return c.json({ error: 'Cross-site requests are not allowed.' }, 403);
