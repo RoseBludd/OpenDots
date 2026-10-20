@@ -4,7 +4,12 @@ import { z } from 'zod';
 import { Platform } from './platform.js';
 import { VoiceService } from './voice.js';
 import { resolveProjectPath } from './project-path.js';
-import { dotLookSchema, dotModelFields, dotModelSchema } from './dot-model.js';
+import {
+  dotLookSchema,
+  dotModelFields,
+  dotModelSchema,
+  dotOrderSchema,
+} from './dot-model.js';
 import {
   learningContainerIdSchema,
   validateLearningSettings,
@@ -128,6 +133,12 @@ export function workspaceRoutes(platform: Platform, voice: VoiceService) {
     await platform.computers.stop(id).catch(() => undefined);
     platform.workspace.deleteDot(id);
     return c.json({ ok: true });
+  });
+  app.put('/dots/order', async (c) => {
+    const data = dotOrderSchema.safeParse(await c.req.json().catch(() => null));
+    if (!data.success)
+      return c.json({ error: 'Send ids: a list of Dot ids.' }, 400);
+    return c.json(platform.workspace.setDotOrder(data.data.ids));
   });
   app.put('/dots/:id', async (c) => {
     const data = dotSchema.safeParse(await c.req.json());

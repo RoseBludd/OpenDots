@@ -33,6 +33,10 @@ export const dotLookSchema = z.object({
   hue: z.number().int().min(0).max(359).nullable().optional(),
 });
 
+export const dotOrderSchema = z.object({
+  ids: z.array(z.string().min(1)).min(1).max(200),
+});
+
 export const dotModelSchema = z.object(dotModelFields).strict();
 
 export class DotModelError extends Error {}

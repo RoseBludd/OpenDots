@@ -48,6 +48,7 @@ export function App() {
   const [workspace, setWorkspace] = useState<WorkspaceState>();
   const [selectedDot, setSelectedDot] = useState('');
   const [selectedThread, setSelectedThread] = useState<string>();
+  const [dragDot, setDragDot] = useState<string>();
   const [view, rawSetView] = useState<'chat' | 'tasks' | 'memories' | 'space'>(
     'chat',
   );
@@ -124,7 +125,16 @@ export function App() {
       setState(s);
       setWorkspace(w);
       setNeedsAuth(false);
-      setSelectedDot((previous) => previous || w.dots[0]?.id || '');
+      setSelectedDot((previous) => {
+        if (previous) return previous;
+        const first = w.dots[0];
+        if (first)
+          setSelectedThread(
+            (thread) =>
+              thread ?? w.conversations.find((c) => c.dotId === first.id)?.id,
+          );
+        return first?.id ?? '';
+      });
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) setNeedsAuth(true);
       else
@@ -538,50 +548,71 @@ export function App() {
           )}
         </div>
         <nav className="dots-nav" aria-label="Dots">
-          {[...workspace.dots]
-            .sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned))
-            .map((item) => (
-              <div className="dot-nav-row" key={item.id}>
-                <button
-                  className={`dot-nav ${dot.id === item.id && view === 'chat' ? 'active' : ''}`}
-                  aria-current={
-                    dot.id === item.id && view === 'chat' ? 'page' : undefined
-                  }
-                  onClick={() => chooseDot(item)}
-                >
-                  <Mascot
-                    identity={item.id}
-                    character={item.avatar}
-                    hue={item.hue}
-                    name={item.name}
-                    small
-                    decorative
-                  />
-                  <span>{item.name}</span>
-                </button>
-                <button
-                  className={`icon-button dot-pin ${item.pinned ? 'pinned' : ''}`}
-                  aria-label={`${item.pinned ? 'Unpin' : 'Pin'} ${item.name}`}
-                  aria-pressed={!!item.pinned}
-                  onClick={() =>
-                    void mutate(`/dots/${item.id}/look`, 'PUT', {
-                      pinned: !item.pinned,
-                    })
-                  }
-                >
-                  <Pin size={13} />
-                </button>
-                <button
-                  className="icon-button dot-settings"
-                  aria-label={`Edit ${item.name} settings`}
-                  onClick={() =>
-                    setDialog({ type: 'dot', dot: item, spaceId: item.spaceId })
-                  }
-                >
-                  <MoreHorizontal size={15} />
-                </button>
-              </div>
-            ))}
+          {workspace.dots.map((item) => (
+            <div
+              className={`dot-nav-row ${dragDot === item.id ? 'dragging' : ''}`}
+              key={item.id}
+              draggable
+              onDragStart={(event) => {
+                setDragDot(item.id);
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', item.id);
+              }}
+              onDragOver={(event) => {
+                if (dragDot && dragDot !== item.id) event.preventDefault();
+              }}
+              onDragEnd={() => setDragDot(undefined)}
+              onDrop={(event) => {
+                event.preventDefault();
+                const from = dragDot;
+                setDragDot(undefined);
+                if (!from || from === item.id) return;
+                const ids = workspace.dots.map((d) => d.id);
+                ids.splice(ids.indexOf(from), 1);
+                ids.splice(ids.indexOf(item.id), 0, from);
+                void mutate('/dots/order', 'PUT', { ids });
+              }}
+            >
+              <button
+                className={`dot-nav ${dot.id === item.id && view === 'chat' ? 'active' : ''}`}
+                aria-current={
+                  dot.id === item.id && view === 'chat' ? 'page' : undefined
+                }
+                onClick={() => chooseDot(item)}
+              >
+                <Mascot
+                  identity={item.id}
+                  character={item.avatar}
+                  hue={item.hue}
+                  name={item.name}
+                  small
+                  decorative
+                />
+                <span>{item.name}</span>
+              </button>
+              <button
+                className={`icon-button dot-pin ${item.pinned ? 'pinned' : ''}`}
+                aria-label={`${item.pinned ? 'Unpin' : 'Pin'} ${item.name}`}
+                aria-pressed={!!item.pinned}
+                onClick={() =>
+                  void mutate(`/dots/${item.id}/look`, 'PUT', {
+                    pinned: !item.pinned,
+                  })
+                }
+              >
+                <Pin size={13} />
+              </button>
+              <button
+                className="icon-button dot-settings"
+                aria-label={`Edit ${item.name} settings`}
+                onClick={() =>
+                  setDialog({ type: 'dot', dot: item, spaceId: item.spaceId })
+                }
+              >
+                <MoreHorizontal size={15} />
+              </button>
+            </div>
+          ))}
         </nav>
         {direct ? (
           <></>
@@ -762,7 +793,9 @@ export function App() {
           </div>
         )}
         {view === 'space' && direct ? (
-          <div className="notice direct-mode-note">Pages need Intelligence.</div>
+          <div className="notice direct-mode-note">
+            Pages need Intelligence.
+          </div>
         ) : view === 'space' ? (
           <SpaceWorkspace
             key={spaceId}

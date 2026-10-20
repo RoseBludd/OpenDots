@@ -35,6 +35,7 @@ export class WorkspaceStore {
       ['dots', 'desk', 'TEXT'],
       ['dots', 'pinned', 'INTEGER NOT NULL DEFAULT 0'],
       ['dots', 'hue', 'INTEGER'],
+      ['dots', 'position', 'INTEGER'],
       ['thread_bindings', 'learningContainerId', 'TEXT'],
     ]) {
       if (
@@ -119,7 +120,9 @@ export class WorkspaceStore {
   }
   dots(): Dot[] {
     return this.db
-      .prepare('SELECT * FROM dots ORDER BY createdAt')
+      .prepare(
+        'SELECT * FROM dots ORDER BY pinned DESC, position IS NULL, position, createdAt',
+      )
       .all()
       .map((row) => ({
         ...row,
@@ -295,6 +298,16 @@ export class WorkspaceStore {
         id,
       );
     return this.dot(id)!;
+  }
+  /** Stores the sidebar order; ids not listed keep their relative order after the listed ones. */
+  setDotOrder(ids: string[]) {
+    const known = new Set(this.dots().map((dot) => dot.id));
+    const ordered = ids.filter(
+      (id, index) => known.has(id) && ids.indexOf(id) === index,
+    );
+    const update = this.db.prepare('UPDATE dots SET position=? WHERE id=?');
+    ordered.forEach((id, index) => update.run(index, id));
+    return this.dots();
   }
   /** Removes a Dot with its local conversation bindings, calls, tasks and page threads. */
   deleteDot(id: string) {
