@@ -288,7 +288,12 @@ export class DirectModel {
           log: this.options.log,
         });
       }
-      return { ...result, text: stripToolCalls(result.text) || result.text };
+      return {
+        ...result,
+        text:
+          stripToolCalls(result.text) ||
+          'I could not finish that: my tool lookups did not return a usable answer. Try again or ask me to answer without looking things up.',
+      };
     });
     const user = this.threads.append(threadId, 'user', prompt);
     const finalText = prompt.startsWith(HANDOFF_PREFIX)

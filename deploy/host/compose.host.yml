@@ -9,7 +9,7 @@
 name: opendots-host
 services:
   app:
-    image: opendots-app:9fa0916-host
+    image: opendots-app:f635647-host
     env_file: .env
     environment:
       HOST: 0.0.0.0
@@ -22,10 +22,12 @@ services:
       OPENAI_BASE_URL: https://cadis.geniuzs.com/v1
       OPENAI_MODEL: cadis-free
       WEB_SEARCH_PROVIDER: parallel
+      DESK_FILES_ROOT: /desk-files
     ports:
       - '127.0.0.1:4321:4310'
     volumes:
       - opendots-data:/data
+      - /mnt/genius_vol_2/opendots/handoff/seats:/desk-files:ro
     networks: [computer-control, computers, app-egress]
     init: true
     restart: unless-stopped
@@ -35,7 +37,7 @@ services:
     security_opt: ['no-new-privileges:true']
     cap_drop: [ALL]
   tailnet-guard:
-    image: opendots-app:9fa0916-host
+    image: opendots-app:f635647-host
     entrypoint: ['node', '/guard/tailnet-guard.mjs']
     network_mode: host
     environment:
