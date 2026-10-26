@@ -20,7 +20,7 @@ services:
       TASK_TIMEOUT_MS: '1860000'
       DOT_RUN_BUDGET_MS: '1800000'
       OPENAI_BASE_URL: https://cadis.geniuzs.com/v1
-      OPENAI_MODEL: cadis-free
+      OPENAI_MODEL: cadis-cursor
       WEB_SEARCH_PROVIDER: parallel
       DESK_FILES_ROOT: /desk-files
     ports:

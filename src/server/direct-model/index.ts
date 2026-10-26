@@ -21,6 +21,7 @@ import {
 } from './client.js';
 import { DirectThreadStore } from './threads.js';
 import { resolveDotModel } from '../dot-model.js';
+import { DEFAULT_DOT_MODEL } from '../../shared/dot-model.js';
 import { HandoffService } from '../handoff/index.js';
 import {
   MAX_TOOL_ROUNDS,
@@ -51,7 +52,7 @@ export function directModelConfig(
   return {
     apiKey: config.apiKey!,
     baseUrl: config.baseUrl,
-    model: config.model || 'cadis-free',
+    model: config.model || DEFAULT_DOT_MODEL,
     fallbackModel: env.OPENAI_FALLBACK_MODEL?.trim() || undefined,
     temperature: config.temperature,
     maxOutputTokens: config.maxOutputTokens,

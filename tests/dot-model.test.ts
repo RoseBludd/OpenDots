@@ -34,7 +34,7 @@ describe('resolveDotModel', () => {
     });
     expect(resolveDotModel({ model: 'cadis' }, config, {}).model).toBe('cadis');
     expect(resolveDotModel({}, { apiKey: SHARED }, {}).model).toBe(
-      'cadis-free',
+      'cadis-cursor',
     );
   });
   it('uses the desk key and X-Cadis-Desk header per Dot', () => {

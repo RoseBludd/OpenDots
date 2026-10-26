@@ -150,7 +150,7 @@ export function directModelRoutes(direct: DirectModel) {
       return c.json(
         {
           error:
-            'Choose a model (cadis-free or cadis) and an optional desk name (lowercase letters, digits, dashes).',
+            'Choose a model (cadis-cursor, cadis-free or cadis) and an optional desk name (lowercase letters, digits, dashes).',
         },
         400,
       );
