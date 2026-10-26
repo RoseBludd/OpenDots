@@ -31,7 +31,7 @@ Edit `.env` on the server and restart after changes:
 | --------------------------------------------- | --------------------------------------------------------- |
 | `INTELLIGENCE_API_KEY`                        | Project credential for conversation persistence           |
 | `INTELLIGENCE_API_URL`, `INTELLIGENCE_WS_URL` | Endpoint overrides for your Intelligence deployment       |
-| `OPENAI_API_KEY`, `OPENAI_MODEL`              | Model credential and model identifier                     |
+| `OPENAI_API_KEY`, `OPENAI_MODEL`              | Model credential and model identifier (default Dot brain: `cadis-cursor`, Cursor Composer 2.5 fast=false via the CADIS gateway) |
 | `OPENAI_BASE_URL`                             | Compatible model API endpoint                             |
 | `OWNER_ID`                                    | Stable identity used for this deployment's conversations  |
 | `DATABASE_PATH`                               | SQLite file containing pages, workspace and work metadata |
