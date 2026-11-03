@@ -150,12 +150,11 @@ async function parallelSearch(query: string, options: ToolOptions): Promise<stri
 
 async function webSearch(query: string, options: ToolOptions): Promise<string> {
   const key = options.parallelApiKey ?? process.env.PARALLEL_API_KEY?.trim();
-  if (key || options.parallelSearch) {
-    try {
-      return await parallelSearch(query, { ...options, parallelApiKey: key });
-    } catch (error) {
-      if (options.signal?.aborted) throw error;
-    }
+  // The anonymous Parallel tier needs no key; DuckDuckGo is only the fallback (it times out from the host).
+  try {
+    return await parallelSearch(query, { ...options, parallelApiKey: key || undefined });
+  } catch (error) {
+    if (options.signal?.aborted) throw error;
   }
   const response = await guardedFetch(
     'https://html.duckduckgo.com/html/',
