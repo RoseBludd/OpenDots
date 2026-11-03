@@ -338,7 +338,7 @@ export class DirectModel {
     const web = this.options.research;
     if (
       web &&
-      (web.parallelApiKey ||
+      ((web.webSearchProvider ?? 'parallel') === 'parallel' ||
         (web.webSearchProvider === 'browser' &&
           web.browserUrl &&
           web.browserSecret &&

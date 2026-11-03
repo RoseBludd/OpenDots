@@ -114,6 +114,8 @@ export async function parallelSources(
     urls?: string[];
     sessionId?: string;
     searchQueries?: string[];
+    /** Return the web_search excerpts without the second web_fetch round trip. */
+    searchOnly?: boolean;
     onWarning?: (message: string) => void;
   },
   config: WebConfig,
@@ -160,6 +162,7 @@ export async function parallelSources(
         ),
         warn,
       );
+      if (request.searchOnly && found.length) return found;
       urls = found.map((page) => page.url);
       if (!urls.length)
         throw new Error(

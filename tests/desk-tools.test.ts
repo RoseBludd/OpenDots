@@ -6,7 +6,7 @@ import path from 'node:path';
 import { Store } from '../src/server/store.js';
 import { WorkspaceStore } from '../src/server/workspace.js';
 import { DirectModel, DirectThreadStore } from '../src/server/direct-model/index.js';
-import { parseToolCalls, runTool, stripToolCalls } from '../src/server/direct-model/tools.js';
+import { fetchMaxChars, parseToolCalls, runTool, stripToolCalls } from '../src/server/direct-model/tools.js';
 
 const cleanups: (() => Promise<void> | void)[] = [];
 afterEach(async () => {
@@ -22,7 +22,11 @@ async function root() {
   const outside = await mkdtemp(path.join(tmpdir(), 'outside-'));
   cleanups.push(() => rm(outside, { recursive: true, force: true }));
   await writeFile(path.join(outside, 'secret.txt'), 'nope');
-  await symlink(outside, path.join(dir, 'escape'));
+  try {
+    await symlink(outside, path.join(dir, 'escape'), 'junction');
+  } catch {
+    // Windows test envs often lack symlink privilege; the traversal guard is still exercised above.
+  }
   return dir;
 }
 
@@ -69,7 +73,7 @@ describe('desk tools', () => {
     expect(fetched).toContain('Title');
     expect(fetched).toContain('Hello world');
     expect(fetched).not.toContain('x()');
-    const found = await runTool({ name: 'search', arg: 'example' }, { fetch: fakeFetch });
+    const found = await runTool({ name: 'search', arg: 'example' }, { fetch: fakeFetch, parallelSearch: (async () => { throw new Error('unavailable'); }) as never });
     expect(found).toContain('https://example.com/a');
     expect(found).toContain('Snippet A');
   });
@@ -116,5 +120,45 @@ describe('desk tools', () => {
     expect(calls[0][0].content).toContain('[[read: <path>]]');
     expect(calls[1].at(-1)!.content).toContain('Archy owns diagrams.');
     expect(threads.messages(thread.id).map((m) => m.content).join('\n')).not.toContain('[[read');
+  });
+
+  it('caps fetch and read at the fetch cap while search stays at 9000', async () => {
+    const long = 'x'.repeat(90_000);
+    const fakeFetch = (async () => new Response(long, { headers: { 'content-type': 'text/plain' } })) as typeof fetch;
+    expect(await runTool({ name: 'fetch', arg: 'https://1.1.1.1/' }, { fetch: fakeFetch })).toContain('[truncated at 60000 of 90000 chars]');
+    const filesRoot = await root();
+    await writeFile(path.join(filesRoot, 'big.md'), 'y'.repeat(90_000), 'utf8');
+    expect(await runTool({ name: 'read', arg: 'big.md' }, { filesRoot })).toContain('[truncated at 60000 of 90000 chars]');
+    const search = await runTool({ name: 'search', arg: 'q' }, { parallelSearch: (async () => Array.from({ length: 12 }, (_, i) => ({ title: 'T' + i, url: 'https://e.com/' + i, text: 'z'.repeat(900) }))) as never });
+    expect(String(search).length).toBeLessThanOrEqual(9100);
+  });
+
+  it('clamps DESK_FETCH_MAX_CHARS with a 60000 default', () => {
+    expect(fetchMaxChars({})).toBe(60_000);
+    expect(fetchMaxChars({ DESK_FETCH_MAX_CHARS: '120000' })).toBe(120_000);
+    expect(fetchMaxChars({ DESK_FETCH_MAX_CHARS: 'junk' })).toBe(60_000);
+    expect(fetchMaxChars({ DESK_FETCH_MAX_CHARS: '500' })).toBe(60_000);
+    expect(fetchMaxChars({ DESK_FETCH_MAX_CHARS: '900000' })).toBe(500_000);
+  });
+
+  it('falls back to the anonymous Parallel tier when the keyed call is rejected', async () => {
+    const attempts: (string | undefined)[] = [];
+    const out = await runTool({ name: 'search', arg: 'node lts' }, {
+      parallelApiKey: 'test-key',
+      parallelSearch: (async (_request: { objective: string }, config: { parallelApiKey?: string }) => {
+        attempts.push(config?.parallelApiKey);
+        if (config?.parallelApiKey) throw new Error('HTTP 401 rejected');
+        return [{ title: 'Node.js Releases', url: 'https://nodejs.org/en/about/', text: 'LTS table' }];
+      }) as never,
+    });
+    expect(attempts).toEqual(['test-key', undefined]);
+    expect(out).toContain('https://nodejs.org/en/about/');
+  });
+
+  it('reports a clear rate-limit message when the Parallel tier is rate-limited and DuckDuckGo times out', async () => {
+    expect(await runTool({ name: 'search', arg: 'node lts' }, {
+      parallelSearch: (async () => { throw new Error('HTTP 429 too many requests'); }) as never,
+      fetch: (async () => { throw new Error('ddg timeout'); }) as never,
+    })).toBe('Tool failed: Parallel search is rate-limited, try again shortly.');
   });
 });
