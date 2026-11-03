@@ -1,6 +1,8 @@
 // Routes mounted at /api in direct-model mode (no Platform). Shapes follow
 // workspace-routes.ts (/workspace, /conversations) so clients keep working;
 // Intelligence-only features answer 501 instead of falling through to 404.
+import { readdir, readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { z } from 'zod';
@@ -179,6 +181,25 @@ export function directModelRoutes(direct: DirectModel) {
         memoryAllowed: current.memoryAllowed,
       }),
     );
+  });
+  // Email/Slack drafts the Dots prepared ([[draft_email]] / [[draft_slack]]); read-only, nothing here sends.
+  app.get('/drafts', async (c) => {
+    const base = direct.options.workRoot ?? (process.env.DESK_WORK_ROOT?.trim() || undefined);
+    if (!base) return c.json({ drafts: [] });
+    const drafts: unknown[] = [];
+    for (const desk of await readdir(base).catch(() => [] as string[])) {
+      const dir = path.join(base, desk, 'drafts');
+      for (const file of await readdir(dir).catch(() => [] as string[])) {
+        if (!file.endsWith('.json')) continue;
+        try {
+          drafts.push({ desk, file, ...JSON.parse(await readFile(path.join(dir, file), 'utf8')) });
+        } catch {
+          /* skip unreadable draft */
+        }
+      }
+    }
+    drafts.sort((a: any, b: any) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    return c.json({ drafts: drafts.slice(0, 100) });
   });
   app.get('/conversations/:id/capture', (c) =>
     owned(c.req.param('id'))
