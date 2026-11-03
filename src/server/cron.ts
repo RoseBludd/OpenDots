@@ -23,7 +23,7 @@ export function parseCron(expr: string): string | null {
 /** True when the string names a valid IANA time zone. */
 export function validTz(tz: string): boolean {
   try {
-    new Intl.DateTimeFormat(tz);
+    new Intl.DateTimeFormat(undefined, { timeZone: tz });
     return true;
   } catch {
     return false;
