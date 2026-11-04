@@ -68,7 +68,7 @@ export class DotAgent extends AbstractAgent {
       const computerWork =
         !!this.config.computerSupervisorUrl &&
         this.workspace.computers.permissions(this.dotId).enabled;
-      const budgetMs = computerWork ? Number(process.env.DOT_RUN_BUDGET_MS) || 300_000 : 90_000;
+      const budgetMs = Number(process.env.DOT_RUN_BUDGET_MS) || 600_000;
       const timeout = setTimeout(() => {
         // Say why the run ended; an abort alone leaves the stream without a terminal event.
         subscriber.next(
@@ -248,7 +248,7 @@ export class DotAgent extends AbstractAgent {
                   .min(1)
                   .max(3)
                   .describe(
-                    'One to three concise keyword queries, ideally 3–6 words each.',
+                    'One to three concise keyword queries, ideally 3â€“6 words each.',
                   ),
               }),
               execute: ({ objective, search_queries }) =>

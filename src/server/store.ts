@@ -276,7 +276,7 @@ export class Store {
         .prepare(
           "UPDATE tasks SET status='running', lease=?, leaseUntil=?, nextRunAt=NULL, error=NULL, attempts=attempts+1, updatedAt=? WHERE id=?",
         )
-        .run(lease, now + Math.max(180_000, (Number(process.env.TASK_TIMEOUT_MS) || 90_000) + 30_000), now, task.id);
+        .run(lease, now + Math.max(180_000, (Number(process.env.TASK_TIMEOUT_MS) || 600_000) + 30_000), now, task.id);
       this.db
         .prepare(
           "INSERT INTO runs VALUES (?, ?, 'running', ?, NULL, NULL, NULL)",

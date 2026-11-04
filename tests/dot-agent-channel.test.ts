@@ -218,6 +218,7 @@ it('exposes only the canonical review tool to web chat and none to Slack', async
 });
 it('ends a run that exceeds its time budget with a clear error instead of silently', async () => {
   vi.useFakeTimers();
+  vi.stubEnv('DOT_RUN_BUDGET_MS', '90000');
   try {
     const f = fixture(false);
     inner.run.mockReturnValue(new Observable<BaseEvent>(() => {}));
@@ -232,6 +233,7 @@ it('ends a run that exceeds its time budget with a clear error instead of silent
     ]);
     expect(inner.abortRun).toHaveBeenCalled();
   } finally {
+    vi.unstubAllEnvs();
     vi.useRealTimers();
   }
 });

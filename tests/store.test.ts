@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -74,6 +74,8 @@ describe('durable task lifecycle', () => {
     expect(store.claim(Date.now())?.id).toBe(task.id);
   });
   it('recovers expired work after restart without duplicate completion', () => {
+    vi.stubEnv('TASK_TIMEOUT_MS', '90000');
+    try {
     const { store } = fixture();
     store.createTask('Recover me');
     const now = Date.now();
@@ -87,5 +89,8 @@ describe('durable task lifecycle', () => {
     expect(
       store.finish(recovered, { text: 'New', sources: [], sample: true }),
     ).toBe(true);
+    } finally {
+    vi.unstubAllEnvs();
+    }
   });
 });

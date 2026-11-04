@@ -6,7 +6,7 @@
 
 **An open-source template for persistent AI agents, each with its own computer. Available on Web and Mobile.**
 
-Built with [CopilotKit](https://github.com/CopilotKit/CopilotKit) and [AG-UI](https://docs.ag-ui.com/introduction). · [Get started](#get-started) · [Overview](#overview) · [Architecture](#architecture) · [Features](#features) · [Contributing](CONTRIBUTING.md)
+Built with [CopilotKit](https://github.com/CopilotKit/CopilotKit) and [AG-UI](https://docs.ag-ui.com/introduction). Â· [Get started](#get-started) Â· [Overview](#overview) Â· [Architecture](#architecture) Â· [Features](#features) Â· [Contributing](CONTRIBUTING.md)
 
 [![CI](https://github.com/CopilotKit/OpenDots/actions/workflows/ci.yml/badge.svg)](https://github.com/CopilotKit/OpenDots/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
@@ -14,7 +14,7 @@ Built with [CopilotKit](https://github.com/CopilotKit/CopilotKit) and [AG-UI](ht
 
 Fully self-hostable. Clone this template and customize it however you want.
 
-[**Building on OpenDots? Meet with the CopilotKit team →**](https://www.copilotkit.ai/talk-to-an-engineer?ref=opendots_readme)
+[**Building on OpenDots? Meet with the CopilotKit team â†’**](https://www.copilotkit.ai/talk-to-an-engineer?ref=opendots_readme)
 
 </div>
 
@@ -30,7 +30,7 @@ https://github.com/user-attachments/assets/4c74fe7d-ecdd-42dd-95da-5d34f9b9576e
 
 </div>
 
-_Ask → browse → approve → save. A live computer view and a human review card appear right in chat, then the approved draft becomes an editable Space page. Enlarged for readability; idle time is trimmed and playback is accelerated._
+_Ask â†’ browse â†’ approve â†’ save. A live computer view and a human review card appear right in chat, then the approved draft becomes an editable Space page. Enlarged for readability; idle time is trimmed and playback is accelerated._
 
 ## Overview
 
@@ -174,7 +174,7 @@ See [Setup](docs/SETUP.md) for configuration, Slack, calls, the browser service,
 | Slack                      | Managed Channels SDK declaration with workspace and user allowlists                                                                     |
 | Calls                      | WebRTC speech, delegated compute, bounded sessions, hangup, and timeline receipts                                                       |
 | Background work            | Scheduled server-side turns in their original conversation, with pause and retry controls                                               |
-| **Handoffs and the Dot registry** | Any Dot can hand off work to another Dot via `handoff_to`, creating a task in the target Dot's thread with the source Dot and a note recorded on the prompt. The `GET /api/handoff/registry` endpoint lists every Dot with its capabilities, spaces, and model — owner-token authenticated. |
+| **Handoffs and the Dot registry** | Any Dot can hand off work to another Dot via `handoff_to`, creating a task in the target Dot's thread with the source Dot and a note recorded on the prompt. The `GET /api/handoff/registry` endpoint lists every Dot with its capabilities, spaces, and model â€” owner-token authenticated. |
 | Browser                    | Separate read-only public-page service with page capture and navigation limits                                                          |
 | Dot computers              | Per-Dot browser profiles, files, shell, takeover, permissions, and action records through OpenBot                                       |
 | Memory                     | User-managed preferences that permitted Dots can use                                                                                    |
@@ -210,7 +210,7 @@ See [Contributing](CONTRIBUTING.md) for development guidance and [Security](SECU
 - [Channels SDK](https://github.com/CopilotKit/channels-sdk)
 - [OpenMuse](https://github.com/CopilotKit/OpenMuse)
 - [OpenBot](https://github.com/CopilotKit/openbot)
-- [OpenTag](https://github.com/CopilotKit/OpenTag) — Channels SDK integration reference
+- [OpenTag](https://github.com/CopilotKit/OpenTag) â€” Channels SDK integration reference
 
 ## License
 
@@ -230,7 +230,7 @@ When `INTELLIGENCE_API_KEY` is empty and `OPENAI_API_KEY` is set, the server run
 
 - **Desk handoff (no Intelligence needed):** the model may emit a line `[[handoff:<desk id>]] <request>`. The server queues it through `HandoffService` as a task in the target desk's thread (`Handoff from <desk>`), the runner executes it, and the answer is posted back into the sender's thread as `Reply from <desk>:`. Handoff tasks cannot hand off again; max 3 per reply. Origins live in the `direct_handoffs` table.
 - **Inline images:** `GET /api/media/<name>` serves png/jpg/gif/webp/svg from `MEDIA_DIR` (default `/data/media`), owner-authenticated; chat renders markdown images only for `/api/media/` URLs.
-- **Read-only desk tools (`src/server/direct-model/tools.ts`):** the model may emit `[[search: q]]`, `[[fetch: https://…]]`, `[[ls: path]]` or `[[read: path]]` (drifted shapes like `[[search(query='q')]` are accepted). The server runs the tool and feeds the result back for up to 4 model rounds, max 3 tags per round. `search` uses the existing Parallel lane (`parallel.ts`, `PARALLEL_API_KEY`) and falls back to DuckDuckGo HTML (blocked from datacenter IPs, so Parallel is the real path). `fetch` refuses non-http(s) URLs and private, loopback and tailnet addresses (also on every redirect hop). `ls`/`read` see only `DESK_FILES_ROOT` (host: `handoff/seats` mounted read-only at `/desk-files`), refuse symlink escapes and binary files. `DESK_TOOLS=off` disables all of it. Nothing writes, sends or executes.
+- **Read-only desk tools (`src/server/direct-model/tools.ts`):** the model may emit `[[search: q]]`, `[[fetch: https://â€¦]]`, `[[ls: path]]` or `[[read: path]]` (drifted shapes like `[[search(query='q')]` are accepted). The server runs the tool and feeds the result back for up to 4 model rounds, max 3 tags per round. `search` uses the existing Parallel lane (`parallel.ts`, `PARALLEL_API_KEY`) and falls back to DuckDuckGo HTML (blocked from datacenter IPs, so Parallel is the real path). `fetch` refuses non-http(s) URLs and private, loopback and tailnet addresses (also on every redirect hop). `ls`/`read` see only `DESK_FILES_ROOT` (host: `handoff/seats` mounted read-only at `/desk-files`), refuse symlink escapes and binary files. `DESK_TOOLS=off` disables all of it. Nothing writes, sends or executes.
 - **Mutating desk tools (WO4a, same tag protocol, same 3-tags-per-round limit, now up to 6 rounds; mutating tags in one reply run in order):**
   - `[[shell: cmd]]` runs one command (single line, 120 s, output capped at 12 kB). Where: the Dot's own desk computer when it is running with its shell permission on (secret-looking env vars are unset first; the computer exec API caps at 60 s), otherwise the `desk-sandbox` container (`deploy/host/desk-sandbox.mjs`, `DESK_SANDBOX_URL`): no `env_file`, no docker socket, no app data, an internal-only network shared with the app, a hand-built env (PATH/HOME/LANG only), cwd `/desk-work/<desk>`. Never runs in the app process. `src/server/direct-model/shell-guard.ts` denies destructive commands before anything runs (recursive rm of `/ /root /mnt /data /etc /var /home ~` and other system dirs, `docker * prune`, `docker volume rm`, `docker compose down -v`, `mkfs*`, `dd of=/dev/*`, `> /dev/sd*`, `DROP DATABASE/SCHEMA`, `TRUNCATE` of non-temp tables, shutdown/reboot/halt/poweroff, fork bombs, `chmod -R 777 /`, anything touching `/data/mtls`, `iptables -F`, `ufw disable`), case-insensitive, whitespace-normalised, also inside `sh -c`/`bash -c`, `;`, `&&`, pipes and `$()`. The model gets `DENIED: <rule>` and the denial is logged. It is a guard against model mistakes; the sandbox is the boundary.
   - `[[write: path]]` newline content newline `[[/write]]` writes under `DESK_WORK_ROOT/<desk>` only (host: `/desk-work`, rw bind of `opendots/desk-work`; `/desk-files` stays read-only). Refuses absolute paths, `..`, and symlink escapes; 2 MB cap. The folder also shows up to `[[ls]]`/`[[read]]` as `work/`.
@@ -241,7 +241,7 @@ When `INTELLIGENCE_API_KEY` is empty and `OPENAI_API_KEY` is set, the server run
 - `GET /api/state` reports `mode: "direct-model"`; `GET /api/workspace` lists Spaces, Dots and conversations.
 - `POST /api/conversations` creates a local conversation for a Dot. `POST /api/conversations/:id/messages` with `{"content": "..."}` returns the reply; add `"stream": true` (or `Accept: text/event-stream`) for `delta`/`done`/`error` server-sent events. `GET /api/conversations/:id/messages` returns the stored history, which is kept in the same SQLite database.
 - Tasks (`POST /api/tasks`, optionally with a `threadId`) run on the model; a bound task's prompt and result are added to its conversation.
-- Each turn is limited by `DOT_RUN_BUDGET_MS` (default 90 s) and tasks also by `TASK_TIMEOUT_MS`. A 5xx or an empty reply is retried once; `OPENAI_FALLBACK_MODEL` (default unset) is then tried once. Failures return a short error without upstream details.
+- Each turn is limited by `DOT_RUN_BUDGET_MS` (default 10 min) and tasks also by `TASK_TIMEOUT_MS`. A 5xx or an empty reply is retried once; `OPENAI_FALLBACK_MODEL` (default unset) is then tried once. Failures return a short error without upstream details.
 - No tools run in this mode. Live chat streaming in the app, voice, computers, pages and Dot/Space editing require Intelligence and answer `501`.
 
 ## Per-Dot memory
@@ -261,4 +261,4 @@ Schedules come in two interchangeable kinds, set via `PUT /api/tasks/:id/schedul
 - **Interval** (existing): `{"intervalSeconds": 3600}` (60 s to one year) re-runs the task that long after each successful run.
 - **Cron time-of-day**: `{"cron": "30 9 * * *", "tz": "America/Chicago"}` uses a 5-field cron expression with an IANA time zone (default `America/Chicago`). The next fire is computed after each successful run; the first fire is scheduled when the task is created. Cron parsing and next-run computation (`src/server/cron.ts`) are ported from RoseBludd/hermes `vendor/hermes-agent/cron/jobs.py`, using the cron-parser library, the TypeScript equivalent of Hermes' Python croniter, so DST transitions skip wall-clock minutes that do not exist. `POST /api/tasks` also accepts optional `dotId` (default: the Dot owning the bound conversation) and `cron`/`tz`.
 
-Failed tasks follow a work-order claim/retry/escalate flow ported from RoseBludd/hermes (`scripts/hermes-wo-tracker.sh` → `wo-escalation-queue.sh`): a failed task is re-queued with a growing cooldown (one minute per prior attempt) until `DOT_TASK_RETRIES` attempts (default 3) are spent, then escalated once — it stops retrying, keeps its error, and logs a `Work order escalated` event for a human to pick up. Re-queuing a task manually resets the retry budget. Environment knobs: `DOT_WORKERS`, `DOT_TASK_RETRIES`, `TASK_TIMEOUT_MS`, `DOT_RUN_BUDGET_MS`.
+Failed tasks follow a work-order claim/retry/escalate flow ported from RoseBludd/hermes (`scripts/hermes-wo-tracker.sh` â†’ `wo-escalation-queue.sh`): a failed task is re-queued with a growing cooldown (one minute per prior attempt) until `DOT_TASK_RETRIES` attempts (default 3) are spent, then escalated once â€” it stops retrying, keeps its error, and logs a `Work order escalated` event for a human to pick up. Re-queuing a task manually resets the retry budget. Environment knobs: `DOT_WORKERS`, `DOT_TASK_RETRIES`, `TASK_TIMEOUT_MS`, `DOT_RUN_BUDGET_MS`.

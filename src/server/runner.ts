@@ -73,7 +73,7 @@ export class Runner {
         controller.abort(
           new Error('Task exceeded the TASK_TIMEOUT_MS time limit.'),
         ),
-      Number(process.env.TASK_TIMEOUT_MS) || 90_000,
+      Number(process.env.TASK_TIMEOUT_MS) || 600_000,
     );
     try {
       const settings = this.store.settings();

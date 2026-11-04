@@ -116,7 +116,7 @@ export class DirectModel {
   }
   budgetMs() {
     return (
-      this.options.budgetMs ?? (Number(process.env.DOT_RUN_BUDGET_MS) || 90_000)
+      this.options.budgetMs ?? (Number(process.env.DOT_RUN_BUDGET_MS) || 600_000)
     );
   }
 
