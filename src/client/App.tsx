@@ -116,12 +116,22 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState('');
   const [taskDetail, setTaskDetail] = useState<Detail>();
+  const refreshFailures = useRef(0);
+  const firstRefresh = useRef(true);
   const refresh = useCallback(async () => {
     try {
       const [s, w] = await Promise.all([
         api<State>('/state'),
         api<WorkspaceState>('/workspace'),
       ]);
+      refreshFailures.current = 0;
+      firstRefresh.current = false;
+      setError((previous) =>
+        previous === 'Server returned an unreadable response.' ||
+        previous === 'Could not connect to the server.'
+          ? ''
+          : previous,
+      );
       setState(s);
       setWorkspace(w);
       setNeedsAuth(false);
@@ -136,8 +146,14 @@ export function App() {
         return first?.id ?? '';
       });
     } catch (e) {
-      if (e instanceof ApiError && e.status === 401) setNeedsAuth(true);
-      else
+      if (e instanceof ApiError && e.status === 401) {
+        setNeedsAuth(true);
+        return;
+      }
+      // Background polls tolerate transient blips (proxy 502s during long
+      // computer round-trips). Only surface after repeated failures.
+      refreshFailures.current += 1;
+      if (firstRefresh.current || refreshFailures.current >= 3)
         setError(
           e instanceof Error ? e.message : 'Could not connect to the server.',
         );
