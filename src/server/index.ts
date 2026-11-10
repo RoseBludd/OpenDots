@@ -104,6 +104,12 @@ const config: PlatformConfig = {
   slackDotId: process.env.SLACK_DOT_ID || undefined,
   runtimeUrl: `http://${host === '::1' ? '[::1]' : '127.0.0.1'}:${port}/api/copilotkit`,
   ownerToken,
+  deskFilesRoot: process.env.DESK_FILES_ROOT || undefined,
+  deskWorkRoot: process.env.DESK_WORK_ROOT || undefined,
+  deskSandboxUrl: process.env.DESK_SANDBOX_URL || undefined,
+  githubToken: process.env.GITHUB_TOKEN || undefined,
+  cloudflareToken: process.env.CLOUDFLARE_API_TOKEN || undefined,
+  cloudflareAccountId: process.env.CLOUDFLARE_ACCOUNT_ID || undefined,
 };
 
 const platform = config.intelligenceKey
@@ -122,8 +128,11 @@ const researchConfig = {
 };
 
 // No Intelligence key but a model key: Dots and tasks call the model directly.
+// Hybrid (WO-P1): Intelligence present *and* a model key present also builds
+// DirectModel, but only to mount its own REST routes (createApp/app.ts) and give
+// every Dot its desk tools; Runner keeps using the Intelligence/platform path below.
 const direct =
-  !platform && directModeEnabled(config)
+  (platform ? !!config.apiKey : directModeEnabled(config))
     ? new DirectModel({
         store,
         workspace,
@@ -138,7 +147,7 @@ const runner = new Runner(
   store,
   researchConfig,
   async (claim, memories, signal, progress) => {
-    if (direct) return direct.execute(claim, memories, signal, progress);
+    if (direct && !platform) return direct.execute(claim, memories, signal, progress);
     const threadId = workspace.taskThread(claim.id);
     if (!threadId)
       throw new Error(

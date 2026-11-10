@@ -34,6 +34,17 @@ export interface PlatformConfig extends WebConfig {
   slackDotId?: string;
   runtimeUrl: string;
   ownerToken?: string;
+  /** Shared desk files (brief/state/log/transcript), read-only, one subfolder per desk. */
+  deskFilesRoot?: string;
+  /** Per-desk private work folder for the desk_write/draft_* tools. */
+  deskWorkRoot?: string;
+  /** Lightweight no-secrets shell sandbox for desk_shell when a Dot has no full computer. */
+  deskSandboxUrl?: string;
+  /** Read-only GitHub REST GET for desk_github. */
+  githubToken?: string;
+  /** Read-only Cloudflare API v4 GET for desk_cloudflare. */
+  cloudflareToken?: string;
+  cloudflareAccountId?: string;
 }
 export function setupStatus(
   config: PlatformConfig,

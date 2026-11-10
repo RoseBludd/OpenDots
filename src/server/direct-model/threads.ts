@@ -65,6 +65,17 @@ export class DirectThreadStore {
     this.db
       .prepare('INSERT INTO direct_messages VALUES (?, ?, ?, ?, ?, ?)')
       .run(value.id, threadId, role, content, model, value.createdAt);
+    this.prune(threadId);
     return value;
+  }
+  /** Keeps only the most recent `keep` rows per thread (matches history()'s default window). */
+  private prune(threadId: string, keep = 24) {
+    this.db
+      .prepare(
+        `DELETE FROM direct_messages WHERE threadId = ? AND id NOT IN (
+           SELECT id FROM direct_messages WHERE threadId = ? ORDER BY createdAt DESC, rowid DESC LIMIT ?
+         )`,
+      )
+      .run(threadId, threadId, keep);
   }
 }

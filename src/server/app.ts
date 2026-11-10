@@ -103,7 +103,10 @@ export function createApp({
   paperclipBridge,
   handoff,
 }: AppOptions) {
-  const direct = platform ? undefined : directOption;
+  // Hybrid (WO-P1): when both are configured, Intelligence (platform) stays the
+  // primary chat/task path below; direct only adds its own REST routes
+  // (directModelRoutes) alongside it, never overriding platform behavior.
+  const direct = directOption;
   // Per-Dot memory scope (WO-02) lives with the Dots; absent in sample mode.
   const workspace = platform?.workspace ?? direct?.workspace ?? workspaceOption;
   const dotIdField = z.string().min(1).max(200).nullable().optional();
@@ -178,8 +181,8 @@ export function createApp({
       memories: workspace
         ? workspace.memoryScopes.annotate(store.memories())
         : store.memories(),
-      mode: direct ? direct.mode : config.mode,
-      configured: direct ? true : configured(config),
+      mode: direct && !platform ? direct.mode : config.mode,
+      configured: direct && !platform ? true : configured(config),
     }),
   );
   app.post('/api/tasks', async (c) => {
@@ -234,7 +237,7 @@ export function createApp({
         );
       }
     }
-    if (direct && parsed.data.threadId) {
+    if (direct && !platform && parsed.data.threadId) {
       try {
         dotId = dotId ?? direct.workspace.requireThread(parsed.data.threadId).dotId;
       } catch {
@@ -253,7 +256,7 @@ export function createApp({
     );
     if (platform && parsed.data.threadId)
       platform.workspace.bindTask(task.id, parsed.data.threadId);
-    if (direct && parsed.data.threadId)
+    if (direct && !platform && parsed.data.threadId)
       direct.workspace.bindTask(task.id, parsed.data.threadId);
     return c.json(task, 201);
   });
